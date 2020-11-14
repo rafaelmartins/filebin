@@ -1,23 +1,24 @@
-package upload
+package mime
 
 import (
 	"errors"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"path/filepath"
 
-	"github.com/rafaelmartins/filebin/internal/highlight"
-	"github.com/rafaelmartins/filebin/internal/magic"
+	"github.com/alecthomas/chroma/lexers"
+	"github.com/rafaelmartins/filebin/internal/mime/magic"
 )
 
 var (
-	contentType     = textproto.CanonicalMIMEHeaderKey("content-type")
-	errMimeNotFound = errors.New("upload: mime type not found")
+	contentType = textproto.CanonicalMIMEHeaderKey("content-type")
+	errNotFound = errors.New("mime: type not found")
 )
 
-func detectFromContent(r io.ReadSeeker) (string, error) {
+func detectFromData(r io.ReadSeeker) (string, error) {
 	// read start of file and rewind
 	var buf [512]byte
 	n, _ := io.ReadFull(r, buf[:])
@@ -35,12 +36,24 @@ func detectFromContent(r io.ReadSeeker) (string, error) {
 		return m, nil
 	}
 
-	return "", errMimeNotFound
+	return "", errNotFound
+}
+
+func getChromaMimetype(filename string) string {
+	lexer := lexers.Match(filename)
+	if lexer == nil {
+		return ""
+	}
+	mimes := lexer.Config().MimeTypes
+	if len(mimes) == 0 {
+		return ""
+	}
+	return mimes[0]
 }
 
 func detectFromFilename(filename string) (string, error) {
 	// try source types first
-	if m := highlight.GetMimeType(filename); m != "" {
+	if m := getChromaMimetype(filename); m != "" {
 		return m, nil
 	}
 
@@ -49,28 +62,32 @@ func detectFromFilename(filename string) (string, error) {
 		return m, nil
 	}
 
-	return "", errMimeNotFound
+	return "", errNotFound
 }
 
-func getMimeType(filename string, r io.ReadSeeker, header textproto.MIMEHeader) (string, error) {
-	if filepath.Ext(filename) != "" {
+func Detect(f io.ReadSeeker, fh *multipart.FileHeader) (string, error) {
+	if f == nil || fh == nil {
+		return "", errNotFound
+	}
+
+	if filepath.Ext(fh.Filename) != "" {
 		// files with extension can be easily matched without looking at the content
-		if m, err := detectFromFilename(filename); err == nil && m != "" {
+		if m, err := detectFromFilename(fh.Filename); err == nil && m != "" {
 			return m, nil
 		}
 	}
 
-	if m, err := detectFromContent(r); err == nil && m != "" {
+	if m, err := detectFromData(f); err == nil && m != "" {
 		return m, nil
 	}
 
 	// our last resource is trusting the mime type sent by http client
 	// this is usually good enough for browsers, but not enough for curl
-	for key, l := range header {
+	for key, l := range fh.Header {
 		if len(l) > 0 && contentType == key {
 			return l[0], nil
 		}
 	}
 
-	return "", errMimeNotFound
+	return "", errNotFound
 }

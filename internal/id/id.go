@@ -25,13 +25,13 @@ func getRandomChar() (uint8, error) {
 	return chars[v], nil
 }
 
-func Generate(length uint) (string, error) {
+func Generate(length uint8) (string, error) {
 	if length == 0 {
 		return "", errors.New("id: invalid id length")
 	}
 	var t strings.Builder
 	t.Grow(int(length))
-	for i := uint(0); i < length; i++ {
+	for i := uint8(0); i < length; i++ {
 		r, err := getRandomChar()
 		if err != nil {
 			return "", err
