@@ -3,6 +3,7 @@ package highlight
 import (
 	"errors"
 	"mime"
+	"strings"
 
 	"github.com/alecthomas/chroma"
 	"github.com/alecthomas/chroma/lexers"
@@ -24,7 +25,17 @@ func GetLexer(mimetype string) string {
 			return lexers.Get("plaintext")
 		}
 
-		return lexers.MatchMimeType(mt)
+		l := lexers.MatchMimeType(mt)
+		if l != nil {
+			return l
+		}
+
+		// if we failed to find a lexer for a text type, use plaintext
+		if strings.HasPrefix(mt, "text/") {
+			return lexers.Get("plaintext")
+		}
+
+		return nil
 	}()
 
 	if l == nil {
