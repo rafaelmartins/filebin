@@ -82,8 +82,8 @@ func Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if fd.GetLexer() != nil {
-		if err := fd.ServeFileHighlight(w, r); err != nil {
+	if fd.GetLexer() != "" {
+		if err := fd.ServeHTML(w, r); err != nil {
 			utils.Error(w, err)
 		}
 		return
@@ -94,7 +94,7 @@ func Download(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", fd.Mimetype)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 	}
-	if err := fd.ServeFile(w, r); err != nil {
+	if err := fd.ServeData(w, r); err != nil {
 		utils.Error(w, err)
 	}
 }
@@ -105,14 +105,14 @@ func DownloadText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if fd.GetLexer() == nil {
+	if fd.GetLexer() == "" {
 		utils.ErrorBadRequest(w)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	if err := fd.ServeFile(w, r); err != nil {
+	if err := fd.ServeData(w, r); err != nil {
 		utils.Error(w, err)
 	}
 }

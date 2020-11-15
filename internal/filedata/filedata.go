@@ -1,16 +1,12 @@
 package filedata
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"os"
-	"path/filepath"
+	"sync"
 	"time"
 
-	"github.com/alecthomas/chroma"
 	"github.com/rafaelmartins/filebin/internal/id"
 	"github.com/rafaelmartins/filebin/internal/mime"
 	"github.com/rafaelmartins/filebin/internal/settings"
@@ -19,7 +15,14 @@ import (
 var (
 	ErrDuplicated = errors.New("models: duplicated")
 	ErrNotFound   = errors.New("models: not found")
+
+	reg = &registry{data: map[string]*FileData{}}
 )
+
+type registry struct {
+	data map[string]*FileData
+	m    sync.Mutex
+}
 
 type FileData struct {
 	id        string
@@ -27,7 +30,8 @@ type FileData struct {
 	Mimetype  string    `json:"mimetype"`
 	Size      int64     `json:"size"`
 	Timestamp time.Time `json:"timestamp"`
-	lexer     chroma.Lexer
+	lexer     *string
+	html      []byte
 }
 
 func NewFromRequest(r *http.Request) (*FileData, error) {
@@ -51,6 +55,7 @@ func NewFromRequest(r *http.Request) (*FileData, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	if fh.Size > size {
 		return nil, errors.New("filedata: uploaded file bigger than allowed size")
@@ -58,6 +63,10 @@ func NewFromRequest(r *http.Request) (*FileData, error) {
 
 	m, err := mime.Detect(f, fh)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
 
@@ -74,7 +83,7 @@ func NewFromRequest(r *http.Request) (*FileData, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := fd.write(); err != nil {
+		if err := fd.writeJSON(); err != nil {
 			if err != ErrDuplicated {
 				return nil, err
 			}
@@ -83,122 +92,34 @@ func NewFromRequest(r *http.Request) (*FileData, error) {
 		}
 	}
 
-	if err := fd.writeFile(f); err != nil {
+	if err := fd.writeData(f); err != nil {
 		return nil, err
 	}
+
+	reg.m.Lock()
+	defer reg.m.Unlock()
+	reg.data[fd.id] = fd
 
 	return fd, nil
 }
 
 func NewFromId(id string) (*FileData, error) {
+	if fd, ok := reg.data[id]; ok {
+		return fd, nil
+	}
+
 	fd := &FileData{
 		id: id,
 	}
-	if err := fd.read(); err != nil {
+	if err := fd.readJSON(); err != nil {
 		return nil, err
 	}
+
+	reg.m.Lock()
+	defer reg.m.Unlock()
+	reg.data[fd.id] = fd
+
 	return fd, nil
-}
-
-func (f *FileData) getFilename() (string, error) {
-	if f.id == "" {
-		return "", errors.New("filedata: id missing")
-	}
-	s, err := settings.Get()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(s.StorageDir, f.id), nil
-}
-
-func (f *FileData) getJsonFilename() (string, error) {
-	fn, err := f.getFilename()
-	if err != nil {
-		return "", err
-	}
-	return fn + ".json", nil
-}
-
-func (f *FileData) read() error {
-	fn, err := f.getJsonFilename()
-	if err != nil {
-		return err
-	}
-
-	fp, err := os.Open(fn)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return ErrNotFound
-		}
-		return err
-	}
-	defer fp.Close()
-
-	return json.NewDecoder(fp).Decode(f)
-}
-
-func (f *FileData) write() error {
-	fn, err := f.getJsonFilename()
-	if err != nil {
-		return err
-	}
-
-	fp, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
-	if err != nil {
-		if os.IsExist(err) {
-			return ErrDuplicated
-		}
-		return err
-	}
-	defer fp.Close()
-
-	return json.NewEncoder(fp).Encode(f)
-}
-
-func (f *FileData) readFile() ([]byte, error) {
-	fn, err := f.getFilename()
-	if err != nil {
-		return nil, err
-	}
-	return ioutil.ReadFile(fn)
-}
-
-func (f *FileData) writeFile(d io.Reader) error {
-	fn, err := f.getFilename()
-	if err != nil {
-		return err
-	}
-
-	fp, err := os.Create(fn)
-	if err != nil {
-		return err
-	}
-
-	n, err := io.Copy(fp, d)
-	if err != nil {
-		fp.Close()
-		os.RemoveAll(fn)
-		return err
-	}
-	if n != f.Size {
-		fp.Close()
-		os.RemoveAll(fn)
-		if n < f.Size {
-			return errors.New("filedata: write: unexpected eof")
-		}
-		return errors.New("filedata: write: mismatched file size")
-	}
-
-	return fp.Close()
-}
-
-func (f *FileData) ServeFile(w http.ResponseWriter, r *http.Request) error {
-	fn, err := f.getFilename()
-	if err != nil {
-		return err
-	}
-	http.ServeFile(w, r, fn)
-	return nil
 }
 
 func (f *FileData) GetId() string {
