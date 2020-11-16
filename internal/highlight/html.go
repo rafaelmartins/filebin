@@ -41,42 +41,10 @@ func GenerateHTML(w io.Writer, r io.Reader, lexer string) error {
 		return err
 	}
 
-	_, err = io.WriteString(w, `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<style type="text/css">
-`)
-	if err != nil {
-		return err
-	}
-
-	if err := generateCSS(w); err != nil {
-		return err
-	}
-
-	_, err = io.WriteString(w, `</style>
-</head>
-<body>
-`)
-	if err != nil {
-		return err
-	}
-
-	if err := getFormatter().Format(w, styles.Fallback, iterator); err != nil {
-		return err
-	}
-
-	_, err = io.WriteString(w, `</body>
-</html>`)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return getFormatter().Format(w, styles.Fallback, iterator)
 }
 
-func generateCSS(w io.Writer) error {
+func GenerateCSS(w io.Writer) error {
 	if css != nil {
 		_, err := w.Write(css)
 		return err

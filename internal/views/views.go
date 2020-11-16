@@ -83,7 +83,7 @@ func Download(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fd.GetLexer() != "" {
-		if err := fd.ServeHTML(w, r); err != nil {
+		if err := highlightFile(w, fd); err != nil {
 			utils.Error(w, err)
 		}
 		return

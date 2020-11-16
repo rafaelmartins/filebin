@@ -31,7 +31,6 @@ type FileData struct {
 	Size      int64     `json:"size"`
 	Timestamp time.Time `json:"timestamp"`
 	lexer     *string
-	html      []byte
 }
 
 func NewFromRequest(r *http.Request) (*FileData, error) {

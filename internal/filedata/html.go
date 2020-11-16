@@ -1,8 +1,6 @@
 package filedata
 
 import (
-	"bytes"
-	"io"
 	"net/http"
 	"os"
 
@@ -18,12 +16,7 @@ func (f *FileData) GetLexer() string {
 	return l
 }
 
-func (f *FileData) ServeHTML(w http.ResponseWriter, r *http.Request) error {
-	if f.html != nil {
-		_, err := w.Write(f.html)
-		return err
-	}
-
+func (f *FileData) GenerateHTML(w http.ResponseWriter) error {
 	fn, err := f.getFilenameData()
 	if err != nil {
 		return err
@@ -35,14 +28,5 @@ func (f *FileData) ServeHTML(w http.ResponseWriter, r *http.Request) error {
 	}
 	defer fp.Close()
 
-	var buf bytes.Buffer
-	mw := io.MultiWriter(w, &buf)
-
-	if err := highlight.GenerateHTML(mw, fp, f.GetLexer()); err != nil {
-		return err
-	}
-
-	f.html = buf.Bytes()
-
-	return err
+	return highlight.GenerateHTML(w, fp, f.GetLexer())
 }
