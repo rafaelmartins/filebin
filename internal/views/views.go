@@ -56,7 +56,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func baseDownload(w http.ResponseWriter, r *http.Request) *filedata.FileData {
+func getFile(w http.ResponseWriter, r *http.Request) *filedata.FileData {
 	vars := mux.Vars(r)
 	id, ok := vars["id"]
 	if !ok {
@@ -76,8 +76,8 @@ func baseDownload(w http.ResponseWriter, r *http.Request) *filedata.FileData {
 	return fd
 }
 
-func Download(w http.ResponseWriter, r *http.Request) {
-	fd := baseDownload(w, r)
+func File(w http.ResponseWriter, r *http.Request) {
+	fd := getFile(w, r)
 	if fd == nil {
 		return
 	}
@@ -99,8 +99,8 @@ func Download(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DownloadText(w http.ResponseWriter, r *http.Request) {
-	fd := baseDownload(w, r)
+func FileText(w http.ResponseWriter, r *http.Request) {
+	fd := getFile(w, r)
 	if fd == nil {
 		return
 	}
@@ -111,6 +111,20 @@ func DownloadText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if err := fd.ServeData(w, r); err != nil {
+		utils.Error(w, err)
+	}
+}
+
+func FileDownload(w http.ResponseWriter, r *http.Request) {
+	fd := getFile(w, r)
+	if fd == nil {
+		return
+	}
+
+	w.Header().Set("Content-Type", fd.Mimetype)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fd.Filename))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if err := fd.ServeData(w, r); err != nil {
 		utils.Error(w, err)

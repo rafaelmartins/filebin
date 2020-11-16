@@ -30,8 +30,9 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", views.Upload).Methods("POST")
 	r.HandleFunc("/", views.Index)
-	r.HandleFunc("/{id}.txt", views.DownloadText)
-	r.HandleFunc("/{id}", views.Download)
+	r.HandleFunc("/download/{id}", views.FileDownload)
+	r.HandleFunc("/{id}.txt", views.FileText)
+	r.HandleFunc("/{id}", views.File)
 
 	fmt.Fprintf(os.Stderr, " * Listening on %s\n", s.ListenAddr)
 	if err := http.ListenAndServe(s.ListenAddr, handlers.LoggingHandler(os.Stderr, r)); err != nil {

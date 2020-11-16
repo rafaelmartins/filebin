@@ -16,7 +16,8 @@ var (
 	tmplDetails = template.Must(template.New("details").Parse(
 		`<strong>File:</strong> {{.Filename}} |
 <strong>Language:</strong> {{.GetLexer}} |
-<a href="/{{.GetId}}.txt">Plain text</a>
+<a href="/{{.GetId}}.txt">Plain text</a> |
+<a href="/download/{{.GetId}}">Download</a>
 <br>
 `))
 )
