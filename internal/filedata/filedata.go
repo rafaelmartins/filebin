@@ -22,7 +22,7 @@ var (
 
 type registry struct {
 	data map[string]*FileData
-	m    sync.Mutex
+	m    sync.RWMutex
 }
 
 type FileData struct {
@@ -104,9 +104,12 @@ func NewFromRequest(r *http.Request) (*FileData, error) {
 }
 
 func NewFromId(id string) (*FileData, error) {
+	reg.m.RLock()
 	if fd, ok := reg.data[id]; ok {
+		reg.m.RUnlock()
 		return fd, nil
 	}
+	reg.m.RUnlock()
 
 	fd := &FileData{
 		id: id,
