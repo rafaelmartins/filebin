@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rafaelmartins/filebin/internal/basicauth"
@@ -89,11 +90,13 @@ func File(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// serve raw file
-	if fd.Mimetype != "" {
-		w.Header().Set("Content-Type", fd.Mimetype)
-		w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", fd.Mimetype)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	if !(strings.HasPrefix(fd.Mimetype, "audio/") || strings.HasPrefix(fd.Mimetype, "image/") || strings.HasPrefix(fd.Mimetype, "video/")) {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fd.GetFilename()))
 	}
+
 	if err := fd.ServeData(w, r); err != nil {
 		utils.Error(w, err)
 	}
