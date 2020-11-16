@@ -124,7 +124,7 @@ func FileDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", fd.Mimetype)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fd.Filename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fd.GetFilename()))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if err := fd.ServeData(w, r); err != nil {
 		utils.Error(w, err)

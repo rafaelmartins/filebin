@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"path/filepath"
+	"strings"
 
 	"github.com/rafaelmartins/filebin/internal/highlight"
 	"github.com/rafaelmartins/filebin/internal/mime/magic"
@@ -75,4 +76,20 @@ func Detect(f io.Reader, fh *multipart.FileHeader) (string, error) {
 	}
 
 	return "", errNotFound
+}
+
+func GetExtension(mimetype string) string {
+	// exceptions
+	if strings.HasPrefix(mimetype, "text/plain") {
+		return ".txt"
+	}
+
+	ext, err := mime.ExtensionsByType(mimetype)
+	if err != nil {
+		return ""
+	}
+	if len(ext) == 0 {
+		return ""
+	}
+	return ext[0]
 }

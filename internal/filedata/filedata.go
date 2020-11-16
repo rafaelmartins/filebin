@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -123,4 +124,21 @@ func NewFromId(id string) (*FileData, error) {
 
 func (f *FileData) GetId() string {
 	return f.id
+}
+
+func (f *FileData) GetFilename() string {
+	if filepath.Ext(f.Filename) == "" {
+		fn := f.Filename
+
+		// exceptions
+		// FIXME: handle other filenames with just special chars
+		if fn == "-" {
+			fn = "stdin"
+		}
+
+		// try to find a file extension
+		fn += mime.GetExtension(f.Mimetype)
+		return fn
+	}
+	return f.Filename
 }

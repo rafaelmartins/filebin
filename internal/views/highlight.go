@@ -11,10 +11,10 @@ import (
 
 var (
 	tmplTitle = template.Must(template.New("title").Parse(
-		`<title>filebin — {{.Filename}}</title>
+		`<title>filebin — {{.GetFilename}}</title>
 `))
 	tmplDetails = template.Must(template.New("details").Parse(
-		`<strong>File:</strong> {{.Filename}} |
+		`<strong>File:</strong> {{.GetFilename}} |
 <strong>Language:</strong> {{.GetLexer}} |
 <a href="/{{.GetId}}.txt">Plain text</a> |
 <a href="/download/{{.GetId}}">Download</a>
