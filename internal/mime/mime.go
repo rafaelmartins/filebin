@@ -3,14 +3,13 @@ package mime
 import (
 	"errors"
 	"io"
-	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"path/filepath"
 	"strings"
 
-	"github.com/rafaelmartins/filebin/internal/highlight"
+	"github.com/danwakefield/fnmatch"
 	"github.com/rafaelmartins/filebin/internal/mime/magic"
 )
 
@@ -26,6 +25,9 @@ func detectFromData(r io.Reader) (string, error) {
 
 	// magic is usually the most reliable tool, let's try it first
 	if m, err := magic.Detect(buf[:n]); err == nil && m != "" {
+		if v, ok := magicMap[m]; ok {
+			return v, nil
+		}
 		return m, nil
 	}
 
@@ -38,16 +40,25 @@ func detectFromData(r io.Reader) (string, error) {
 }
 
 func detectFromFilename(filename string) (string, error) {
-	// try source types first
-	if m, err := highlight.DetectMimetype(filename); err == nil && m != "" {
-		return m, nil
+	index := -1
+	var match *mimeType
+	for _, t := range registry {
+		for i, p := range t.patterns {
+			if fnmatch.Match(p, filename, 0) {
+				if i == 0 {
+					return t.name, nil
+				}
+				if index == -1 || i < index {
+					index = i
+					match = t
+				}
+				break
+			}
+		}
 	}
-
-	// then try from OS mime database (at least on unix)
-	if m := mime.TypeByExtension(filepath.Ext(filename)); m != "" {
-		return m, nil
+	if match != nil && index != -1 {
+		return match.name, nil
 	}
-
 	return "", errNotFound
 }
 
@@ -79,17 +90,17 @@ func Detect(f io.Reader, fh *multipart.FileHeader) (string, error) {
 }
 
 func GetExtension(mimetype string) string {
-	// exceptions
-	if strings.HasPrefix(mimetype, "text/plain") {
-		return ".txt"
+	for _, m := range registry {
+		if m.name == mimetype {
+			if len(m.patterns) == 0 {
+				continue
+			}
+			for _, p := range m.patterns {
+				if ext := filepath.Ext(p); ext != "" && !strings.Contains(ext, "*") {
+					return ext
+				}
+			}
+		}
 	}
-
-	ext, err := mime.ExtensionsByType(mimetype)
-	if err != nil {
-		return ""
-	}
-	if len(ext) == 0 {
-		return ""
-	}
-	return ext[0]
+	return ""
 }

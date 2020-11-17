@@ -44,15 +44,3 @@ func GetLexer(mimetype string) string {
 
 	return l.Config().Name
 }
-
-func DetectMimetype(filename string) (string, error) {
-	lexer := lexers.Match(filename)
-	if lexer == nil {
-		return "", ErrUnsupported
-	}
-	mimes := lexer.Config().MimeTypes
-	if len(mimes) == 0 {
-		return "", ErrUnsupported
-	}
-	return mimes[0], nil
-}
