@@ -2,40 +2,72 @@ package magic
 
 import (
 	"errors"
-	"os/exec"
 	"strings"
+	"sync"
+	"unsafe"
 )
+
+// #cgo pkg-config: libmagic
+// #include <magic.h>
+import "C"
 
 var (
-	ErrNotSupported = errors.New("magic: not supported")
-	fileBin         string
-	fileErr         error
+	cookie C.magic_t
+	m      sync.Mutex
 )
 
-func init() {
-	fileBin, fileErr = exec.LookPath("file")
+func getError() error {
+	if rv := C.magic_error(cookie); rv != nil {
+		return errors.New("magic: " + C.GoString(rv))
+	}
+
+	return errors.New("magic: an error occurred") // *shrug*
+}
+
+func Init() error {
+	m.Lock()
+	defer m.Unlock()
+
+	if cookie != nil {
+		return errors.New("magic: already initialized")
+	}
+
+	cookie = C.magic_open(C.MAGIC_MIME_TYPE)
+	if cookie == nil {
+		return errors.New("magic: failed to open")
+	}
+
+	if rv := C.magic_load(cookie, nil); rv != 0 {
+		err := getError()
+		C.magic_close(cookie)
+		return err
+	}
+
+	return nil
+}
+
+func Close() {
+	m.Lock()
+	defer m.Unlock()
+
+	if cookie == nil {
+		return
+	}
+
+	C.magic_close(cookie)
 }
 
 func Detect(data []byte) (string, error) {
-	if fileErr != nil {
-		return "", ErrNotSupported
+	m.Lock()
+	defer m.Unlock()
+
+	if cookie == nil {
+		return "", errors.New("magic: not initialized")
 	}
 
-	cmd := exec.Command(fileBin, "--mime-type", "--brief", "-")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return "", err
+	if rv := C.magic_buffer(cookie, unsafe.Pointer(&data[0]), C.size_t(len(data))); rv != nil {
+		return strings.TrimSpace(C.GoString(rv)), nil
 	}
 
-	go func() {
-		defer stdin.Close()
-		stdin.Write(data)
-	}()
-
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(string(out)), nil
+	return "", getError()
 }

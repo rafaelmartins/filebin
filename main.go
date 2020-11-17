@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/rafaelmartins/filebin/internal/mime/magic"
 	"github.com/rafaelmartins/filebin/internal/settings"
 	"github.com/rafaelmartins/filebin/internal/views"
 )
@@ -33,6 +34,11 @@ func main() {
 	r.HandleFunc("/download/{id}", views.FileDownload)
 	r.HandleFunc("/{id}.txt", views.FileText)
 	r.HandleFunc("/{id}", views.File)
+
+	if err := magic.Init(); err != nil {
+		usage(err)
+	}
+	defer magic.Close()
 
 	fmt.Fprintf(os.Stderr, " * Listening on %s\n", s.ListenAddr)
 	if err := http.ListenAndServe(s.ListenAddr, handlers.LoggingHandler(os.Stderr, r)); err != nil {
