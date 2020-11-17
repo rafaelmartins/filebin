@@ -7,7 +7,7 @@ import (
 	"unsafe"
 )
 
-// #cgo pkg-config: libmagic
+// #cgo LDFLAGS: -lmagic
 // #include <magic.h>
 import "C"
 
