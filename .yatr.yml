@@ -1,0 +1,8 @@
+default_task_args:
+    - -ldflags
+    - "-X github.com/rafaelmartins/filebin/internal/version.Version={{.Version}}"
+
+targets:
+    distcheck:
+        task_args:
+            - ./...
