@@ -1169,8 +1169,379 @@ var registry = []*mimeType{
 	{"video/x-smv", []string{"*.smv"}},
 	{"x-conference/x-cooltalk", []string{"*.ice"}},
 	{"x-world/x-vrml", []string{"*.vrm", "*.vrml", "*.wrl"}},
+
+	// mimetypes manually inserted
+	{"application/gzip", []string{"*.gz", "*.gzip"}},
 }
 
 var magicMap = map[string]string{
-	"text/x-c": "text/x-csrc",
+	"application/mac-binhex":                    "application/mac-binhex40",
+	"application/vnd.corel-draw":                "image/x-coreldraw",
+	"application/vnd.debian.binary-package":     "application/x-debian-package",
+	"application/vnd.ms-publisher":              "application/x-mspublisher",
+	"application/vnd.ms-visio.drawing.main+xml": "application/vnd.visio",
+	"application/vnd-ms-works":                  "application/vnd.ms-works",
+	"application/vnd.ms-works-db":               "application/vnd.ms-works",
+	"application/vnd.stardivision.cal":          "application/vnd.stardivision.calc",
+	"application/x-dosexec":                     "application/x-msdos-program",
+	"application/x-dxf":                         "image/vnd.dxf",
+	"application/x-font-pfm":                    "application/x-font-type1",
+	"application/x-gzip":                        "application/gzip",
+	"application/x-java-applet":                 "application/java-archive",
+	"application/x-java-image":                  "application/java-archive",
+	"application/x-lzma":                        "application/x-xz",
+	"application/xml-sitemap":                   "text/xml",
+	"application/x-ms-info":                     "application/x-info",
+	"application/x-pef+xml":                     "text/xml",
+	"application/x-quicktime-player":            "application/x-quicktimeplayer",
+	"application/x-rar":                         "application/rar",
+	"application/x-rpm":                         "application/x-redhat-package-manager",
+	"application/x-zip":                         "application/zip",
+	"audio/x-adpcm":                             "audio/adpcm",
+	"audio/x-m4a":                               "audio/mpeg",
+	"audio/x-s3m":                               "audio/s3m",
+	"font/otf":                                  "application/x-font-otf",
+	"font/ttf":                                  "application/x-font-ttf",
+	"image/x-eps":                               "application/postscript",
+	"image/x-xcf":                               "application/x-xcf",
+	"text/x-awk":                                "application/x-awk",
+	"text/x-bytecode.python":                    "application/x-python-code",
+	"text/x-c":                                  "text/x-csrc",
+	"text/x-c++":                                "text/x-c++src",
+	"text/x-forth":                              "application/x-forth",
+	"text/x-gawk":                               "application/x-awk",
+	"text/x-info":                               "application/x-info",
+	"text/x-lisp":                               "text/x-common-lisp",
+	"text/x-msdos-batch":                        "application/x-dos-batch",
+	"text/x-nawk":                               "application/x-awk",
+	"text/x-script.python":                      "application/x-python",
+	"text/x-shellscript":                        "application/x-shellscript",
+	"text/x-texinfo":                            "application/x-texinfo",
+	"video/mpeg4-generic":                       "video/mp4",
 }
+
+/*
+These are libmagic-reported mimetypes that are not handled yet:
+
+application/cbor
+application/sereal
+application/vnd.cups-raster
+application/vnd.font-fontforge-sfd
+application/vnd.hdt
+application/vnd.ms-opentype
+application/vnd.ms-tnef
+application/vnd.sketchup.skp
+application/vnd.softmaker.planmaker
+application/vnd.softmaker.presentations
+application/vnd.sun.xml.base
+application/vnd.sun.xml.writer.web
+application/warc
+application/winhelp
+application/x-abook-addressbook
+application/x-acorn-68E
+application/x-acronis-tib
+application/x-adrift
+application/x-appleworks3
+application/x-arc
+application/x-archive
+application/x-arj
+application/x-atari-7800-rom
+application/x-atari-lynx-rom
+application/x-avira-qua
+application/x-bentley-cel
+application/x-bentley-dgn
+application/x-c32-comboot-syslinux-exec
+application/x-chrome-extension
+application/x-clamav
+application/x-clamav-database
+application/x-compress
+application/x-coredump
+application/x-corel-ccx
+application/x-corel-cph
+application/x-corelpresentations
+application/x-dbf
+application/x-dbm
+application/x-dbt
+application/x-dc-rom
+application/x-dif
+application/x-dmp
+application/x-dosdriver
+application/x-dzip
+application/x-edid-dump
+application/x-eet
+application/x-elc
+application/x-epoc-agenda
+application/x-epoc-app
+application/x-epoc-data
+application/x-epoc-jotter
+application/x-epoc-opl
+application/x-epoc-opo
+application/x-epoc-sheet
+application/x-epoc-word
+application/x-executable
+application/x-fds-disk
+application/x-font-gdos
+application/x-font-pf2
+application/x-font-sfn
+application/x-fpt
+application/x-freeplane
+application/x-fzip
+application/x-gameboy-rom
+application/x-gamecube-rom
+application/x-gamegear-rom
+application/x-garmin-gpm
+application/x-garmin-lbl
+application/x-garmin-map
+application/x-garmin-mdr
+application/x-garmin-net
+application/x-garmin-nod
+application/x-garmin-rgn
+application/x-garmin-srt
+application/x-garmin-tre
+application/x-garmin-trf
+application/x-garmin-typ
+application/x-gba-rom
+application/x-gdbm
+application/x-genesis-32x-rom
+application/x-genesis-rom
+application/x-gettext-translation
+application/x-git
+application/x-gnucash
+application/x-google-ab
+application/x-ia-arc
+application/x-ichitaro4
+application/x-ichitaro5
+application/x-ichitaro6
+application/x-ima
+application/x-incredimail
+application/x-innosetup
+application/x-intel-aml
+application/x-ios-app
+application/x-java-jce-keystore
+application/x-java-jmod
+application/x-java-keystore
+application/x-java-pack200
+application/x-kdelnk
+application/x-lrzip
+application/x-lz4
+application/x-lz4+json
+application/x-lzip
+application/x-macbinary
+application/x-mach-binary
+application/x-maxis-dbpf
+application/x-ms-cag
+application/x-ms-compress-kwaj
+application/x-ms-compress-sz
+application/x-ms-compress-szdd
+application/x-ms-dat
+application/x-ms-ese
+application/x-ms-jumplist
+application/x-ms-mig
+application/x-ms-msg
+application/x-ms-oft
+application/x-ms-pdb
+application/x-ms-reader
+application/x-ms-rra
+application/x-ms-sdb
+application/x-ms-sdi
+application/x-ms-srs
+application/x-ms-thumbnail
+application/x-ms-wim
+application/x-n64-rom
+application/x-nekovm-bytecode
+application/x-neo-geo-pocket-rom
+application/x-nes-rom
+application/x-nintendo-ds-rom
+application/x-nrg
+application/x-numpy-data
+application/x-ole-storage
+application/x-pgp-keyring
+application/x-pnf
+application/x-pocket-word
+application/x-putty-private-key
+application/x-qpress
+application/x-quark-xpress-3
+application/x-riff
+application/x-saturn-rom
+application/x-sc
+application/x-scribus
+application/x-sega-cd-rom
+application/x-sega-pico-rom
+application/x-setupscript
+application/x-sms-rom
+application/x-snappy-framed
+application/x-sqlite3
+application/x-starcalc
+application/x-starchart
+application/x-stargallery-sdg
+application/x-stargallery-thm
+application/x-starimpress
+application/x-starmath
+application/x-star-sdv
+application/x-starwriter
+application/x-starwriter-global
+application/x-std-dictionary
+application/x-svr4-package
+application/x-sylk
+application/x-tasmota-dmp
+application/x-terminfo
+application/x-terminfo2
+application/x-tokyocabinet-btree
+application/x-tokyocabinet-fixed
+application/x-tokyocabinet-hash
+application/x-tokyocabinet-table
+application/x-tplink-bin
+application/x-virtualbox-vhd
+application/x-vnd.corel.designer.document+zip
+application/x-vnd.corel.draw.document+zip
+application/x-vnd.corel.draw.template+zip
+application/x-vnd.corel.symbol.library+zip
+application/x-vnd.corel.zcf.designer.document+zip
+application/x-vnd.corel.zcf.draw.document+zip
+application/x-vnd.corel.zcf.draw.template+zip
+application/x-vnd.corel.zcf.pattern+zip
+application/x-vnd.corel.zcf.symbol.library+zip
+application/x-wii-rom
+application/x-windows-gadget
+application/x-windows-themepack
+application/x-wine-extension-ini
+application/x-wine-extension-msp
+application/x-winhelp
+application/x-winhelp-fts
+application/x-xar
+application/x-xbmc-xbt
+application/x-zoo
+application/zlib
+application/zstd
+audio/vnd.dolby.dd-raw
+audio/x-adx
+audio/x-ape
+audio/x-bcstm
+audio/x-bcwav
+audio/x-bfstm
+audio/x-brstm
+audio/x-dec-basic
+audio/x-hx-aac-adif
+audio/x-hx-aac-adts
+audio/x-mod
+audio/x-mp4a-latm
+audio/x-musepack
+audio/x-psf
+audio/x-sap
+audio/x-unknown
+audio/x-vgm
+audio/x-vpm-garmin
+audio/x-vpm-wav-garmin
+audio/x-w64
+audio/x-xbox360-executable
+audio/x-xbox-executable
+biosig/abf2
+biosig/alpha
+biosig/ates
+biosig/atf
+biosig/axg
+biosig/axona
+biosig/bci2000
+biosig/bdf
+biosig/brainvision
+biosig/ced
+biosig/ced-smr
+biosig/cfwb
+biosig/demg
+biosig/ebs
+biosig/edf
+biosig/embla
+biosig/etg4000
+biosig/fef
+biosig/fiff
+biosig/galileo
+biosig/gdf
+biosig/heka
+biosig/igorpro
+biosig/ishne
+biosig/mfer
+biosig/nev
+biosig/nex1
+biosig/plexon
+biosig/scpecg
+biosig/sigif
+biosig/sigma
+biosig/synergy
+biosig/tms32
+biosig/tmsilog
+biosig/unipro
+biosig/walter-graphtek
+biosig/wcp
+font/sfnt
+image/bpg
+image/fits
+image/heic
+image/heic-sequence
+image/heif
+image/heif-sequence
+image/jp2
+image/jpm
+image/jpx
+image/jxr
+image/wmf
+image/x-award-bioslogo
+image/x-award-bmp
+image/x-cpi
+image/x-dpx
+image/x-epoc-mbm
+image/x-epoc-sketch
+image/x-exr
+image/x-garmin-exe
+image/x-gem
+image/x-gimp-gbr
+image/x-gimp-gih
+image/x-gimp-pat
+image/x-ibm-pointer
+image/x-icns
+image/x-intergraph
+image/x-intergraph-cit
+image/x-intergraph-rgb
+image/x-intergraph-rle
+image/x-lss16
+image/x-miff
+image/x-mvg
+image/x-niff
+image/x-os2-graphics
+image/x-os2-ico
+image/x-paintnet
+image/x-pgf
+image/x-polar-monitor-bitmap
+image/x-portable-greymap
+image/x-quicktime
+image/x-unknown
+image/x-win-bitmap
+image/x-wpg
+image/x-x3f
+image/x-xcursor
+image/x-xpmi
+message/news
+message/x-gnu-rmail
+rinex/broadcast
+rinex/clock
+rinex/meteorological
+rinex/navigation
+rinex/observation
+text/PGP
+text/vnd.sosi
+text/x-Algol68
+text/x-bcpl
+text/x-dmtf-mif
+text/x-gimp-curve
+text/x-gimp-ggr
+text/x-gimp-gpl
+text/x-luatex
+text/x-m4
+text/x-modulefile
+text/x-ms-regedit
+text/x-po
+text/x-systemtap
+text/x-wine-extension-reg
+text/x-xmcd
+video/x-flc
+video/x-jng
+*/
