@@ -2,9 +2,12 @@ package filedata
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,27 +37,8 @@ type FileData struct {
 	lexer     *string
 }
 
-func NewFromRequest(r *http.Request) (*FileData, error) {
-	if r == nil {
-		return nil, errors.New("filedata: nil request")
-	}
-
-	s, err := settings.Get()
-	if err != nil {
-		return nil, err
-	}
-
-	// we store all file data in memory, instead of letting the library use temp files.
-	// this is intended to be used as a private service, it should not be an issue.
-	size := int64(s.UploadMaxSizeMb) * 1024 * 1024
-	if err := r.ParseMultipartForm(size); err != nil {
-		return nil, err
-	}
-
-	f, fh, err := r.FormFile("file")
-	if err != nil {
-		return nil, err
-	}
+func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileData, error) {
+	f, err := fh.Open()
 	defer f.Close()
 
 	if fh.Size > size {
@@ -79,7 +63,7 @@ func NewFromRequest(r *http.Request) (*FileData, error) {
 
 	for {
 		var err error
-		fd.id, err = id.Generate(s.IdLength)
+		fd.id, err = id.Generate(idLength)
 		if err != nil {
 			return nil, err
 		}
@@ -101,6 +85,54 @@ func NewFromRequest(r *http.Request) (*FileData, error) {
 	reg.data[fd.id] = fd
 
 	return fd, nil
+}
+
+func NewFromRequest(r *http.Request) ([]*FileData, error) {
+	if r == nil {
+		return nil, errors.New("filedata: nil request")
+	}
+
+	s, err := settings.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	// we store all file data in memory, instead of letting the library use temp files.
+	// this is intended to be used as a private service, it should not be an issue.
+	size := int64(s.UploadMaxSizeMb) * 1024 * 1024
+	if err := r.ParseMultipartForm(size); err != nil {
+		return nil, err
+	}
+
+	if r.MultipartForm == nil || r.MultipartForm.File == nil {
+		return nil, errors.New("filedata: no files")
+	}
+
+	fhs := r.MultipartForm.File["file"]
+	if len(fhs) == 0 {
+		return nil, errors.New("filedata: no files")
+	}
+
+	fds := []*FileData{}
+	errl := []string{}
+	for i, fh := range fhs {
+		fd, err := processFile(fh, size, s.IdLength)
+		if err != nil {
+			fds = append(fds, nil)
+			errl = append(errl, fmt.Sprintf("%d: %s", i, err.Error()))
+			continue
+		}
+		fds = append(fds, fd)
+	}
+
+	if len(errl) > 0 {
+		err = errors.New(strings.Join(errl, " | "))
+	}
+
+	if len(fds) == 0 {
+		return nil, err
+	}
+	return fds, err
 }
 
 func NewFromId(id string) (*FileData, error) {

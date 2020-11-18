@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -42,18 +43,41 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fd, err := filedata.NewFromRequest(r)
+	fds, err := filedata.NewFromRequest(r)
 	if err != nil {
-		utils.Error(w, err)
-		return
+		if fds == nil {
+			utils.Error(w, err)
+			return
+		}
+
+		log.Printf("error: %s", err)
+
+		// with at least one valid upload we won't return error
+		found := false
+		for _, fd := range fds {
+			if fd != nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			utils.ErrorBadRequest(w)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	if s.BaseUrl != "" {
-		fmt.Fprintf(w, "%s/%s\n", s.BaseUrl, fd.GetId())
-	} else {
-		fmt.Fprintf(w, "%s\n", fd.GetId())
+	for _, fd := range fds {
+		if fd == nil {
+			fmt.Fprintf(w, "failed\n")
+			continue
+		}
+		if s.BaseUrl != "" {
+			fmt.Fprintf(w, "%s/%s\n", s.BaseUrl, fd.GetId())
+		} else {
+			fmt.Fprintf(w, "%s\n", fd.GetId())
+		}
 	}
 }
 
