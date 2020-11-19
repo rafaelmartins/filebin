@@ -39,14 +39,8 @@ func Robots(w http.ResponseWriter, r *http.Request) {
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
-	s, err := settings.Get()
-	if err != nil {
-		utils.Error(w, err)
-		return
-	}
-
 	// authentication
-	if !basicauth.BasicAuth(w, r, s.AuthRealm, s.AuthUsername, s.AuthPassword) {
+	if !basicauth.BasicAuth(w, r) {
 		return
 	}
 
@@ -73,6 +67,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	baseUrl := ""
+	if s, err := settings.Get(); err == nil {
+		baseUrl = s.BaseUrl
+	}
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	for _, fd := range fds {
@@ -80,8 +79,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "failed\n")
 			continue
 		}
-		if s.BaseUrl != "" {
-			fmt.Fprintf(w, "%s/%s\n", s.BaseUrl, fd.GetId())
+		if baseUrl != "" {
+			fmt.Fprintf(w, "%s/%s\n", baseUrl, fd.GetId())
 		} else {
 			fmt.Fprintf(w, "%s\n", fd.GetId())
 		}
@@ -89,14 +88,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
-	s, err := settings.Get()
-	if err != nil {
-		utils.Error(w, err)
-		return
-	}
-
 	// authentication
-	if !basicauth.BasicAuth(w, r, s.AuthRealm, s.AuthUsername, s.AuthPassword) {
+	if !basicauth.BasicAuth(w, r) {
 		return
 	}
 
