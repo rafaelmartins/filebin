@@ -50,6 +50,14 @@ func (f *FileData) writeData(d io.Reader) error {
 	return fp.Close()
 }
 
+func (f *FileData) deleteData() error {
+	fn, err := f.getFilenameData()
+	if err != nil {
+		return err
+	}
+	return os.Remove(fn)
+}
+
 func (f *FileData) ServeData(w http.ResponseWriter, r *http.Request) error {
 	fn, err := f.getFilenameData()
 	if err != nil {

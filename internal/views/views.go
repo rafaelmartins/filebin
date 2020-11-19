@@ -81,6 +81,35 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func Delete(w http.ResponseWriter, r *http.Request) {
+	s, err := settings.Get()
+	if err != nil {
+		utils.Error(w, err)
+		return
+	}
+
+	// authentication
+	if !basicauth.BasicAuth(w, r, s.AuthRealm, s.AuthUsername, s.AuthPassword) {
+		return
+	}
+
+	vars := mux.Vars(r)
+	id, ok := vars["id"]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := filedata.Delete(id); err != nil {
+		if err == filedata.ErrNotFound {
+			http.NotFound(w, r)
+			return
+		}
+		utils.Error(w, err)
+		return
+	}
+}
+
 func getFile(w http.ResponseWriter, r *http.Request) *filedata.FileData {
 	vars := mux.Vars(r)
 	id, ok := vars["id"]

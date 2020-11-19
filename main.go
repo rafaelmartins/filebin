@@ -33,6 +33,7 @@ func main() {
 	r.HandleFunc("/", views.Index)
 	r.HandleFunc("/download/{id}", views.FileDownload)
 	r.HandleFunc("/{id}.txt", views.FileText)
+	r.HandleFunc("/{id}", views.Delete).Methods("DELETE")
 	r.HandleFunc("/{id}", views.File)
 
 	if err := magic.Init(); err != nil {

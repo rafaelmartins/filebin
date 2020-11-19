@@ -48,3 +48,11 @@ func (f *FileData) writeJSON() error {
 
 	return json.NewEncoder(fp).Encode(f)
 }
+
+func (f *FileData) deleteJSON() error {
+	fn, err := f.getFilenameJSON()
+	if err != nil {
+		return err
+	}
+	return os.Remove(fn)
+}

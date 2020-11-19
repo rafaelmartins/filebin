@@ -157,6 +157,23 @@ func NewFromId(id string) (*FileData, error) {
 	return fd, nil
 }
 
+func Delete(id string) error {
+	fd, err := NewFromId(id)
+	if err != nil {
+		return err
+	}
+
+	reg.m.Lock()
+	defer reg.m.Unlock()
+	delete(reg.data, fd.id)
+
+	if err := fd.deleteJSON(); err != nil {
+		return err
+	}
+
+	return fd.deleteData()
+}
+
 func (f *FileData) GetId() string {
 	return f.id
 }
