@@ -25,7 +25,7 @@ func detectFromData(r io.Reader) (string, error) {
 
 	// magic is usually the most reliable tool, let's try it first
 	if m, err := magic.Detect(buf[:n]); err == nil && m != "" {
-		if v, ok := magicMap[m]; ok {
+		if v, ok := magicMap[m]; ok && v != "" {
 			return v, nil
 		}
 		return m, nil
