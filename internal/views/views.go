@@ -31,6 +31,13 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Source code: https://github.com/rafaelmartins/filebin\n")
 }
 
+func Robots(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	fmt.Fprintln(w, "User-agent: *")
+	fmt.Fprintln(w, "Disallow: /")
+}
+
 func Upload(w http.ResponseWriter, r *http.Request) {
 	s, err := settings.Get()
 	if err != nil {

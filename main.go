@@ -32,6 +32,7 @@ func main() {
 	r.HandleFunc("/", views.Upload).Methods("POST")
 	r.HandleFunc("/", views.Index)
 	r.HandleFunc("/download/{id}", views.FileDownload)
+	r.HandleFunc("/robots.txt", views.Robots)
 	r.HandleFunc("/{id}.txt", views.FileText)
 	r.HandleFunc("/{id}", views.Delete).Methods("DELETE")
 	r.HandleFunc("/{id}", views.File)
