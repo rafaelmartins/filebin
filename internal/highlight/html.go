@@ -7,7 +7,6 @@ import (
 
 	"github.com/alecthomas/chroma"
 	"github.com/alecthomas/chroma/formatters/html"
-	"github.com/alecthomas/chroma/lexers"
 	"github.com/alecthomas/chroma/styles"
 	"github.com/rafaelmartins/filebin/internal/settings"
 )
@@ -25,8 +24,7 @@ func getFormatter() *html.Formatter {
 	)
 }
 
-func GenerateHTML(w io.Writer, r io.Reader, lexer string) error {
-	l := lexers.Get(lexer)
+func GenerateHTML(w io.Writer, r io.Reader, l chroma.Lexer) error {
 	if l == nil {
 		return ErrUnsupported
 	}

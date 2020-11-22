@@ -13,34 +13,26 @@ var (
 	ErrUnsupported = errors.New("highlight: unsupported")
 )
 
-func GetLexer(mimetype string) string {
-	l := func() chroma.Lexer {
-		mt, _, err := mime.ParseMediaType(mimetype)
-		if err != nil {
-			return nil
-		}
-
-		// exceptions
-		if mt == "text/plain" {
-			return lexers.Get("plaintext")
-		}
-
-		l := lexers.MatchMimeType(mt)
-		if l != nil {
-			return l
-		}
-
-		// if we failed to find a lexer for a text type, use plaintext
-		if strings.HasPrefix(mt, "text/") {
-			return lexers.Get("plaintext")
-		}
-
-		return nil
-	}()
-
-	if l == nil {
-		return ""
+func GetLexer(mimetype string) (chroma.Lexer, error) {
+	mt, _, err := mime.ParseMediaType(mimetype)
+	if err != nil {
+		return nil, ErrUnsupported
 	}
 
-	return l.Config().Name
+	// exceptions
+	if mt == "text/plain" {
+		return lexers.Get("plaintext"), nil
+	}
+
+	l := lexers.MatchMimeType(mt)
+	if l != nil {
+		return l, nil
+	}
+
+	// if we failed to find a lexer for a text type, use plaintext
+	if strings.HasPrefix(mt, "text/") {
+		return lexers.Get("plaintext"), nil
+	}
+
+	return nil, ErrUnsupported
 }

@@ -66,3 +66,11 @@ func (f *FileData) ServeData(w http.ResponseWriter, r *http.Request) error {
 	http.ServeFile(w, r, fn)
 	return nil
 }
+
+func (f *FileData) OpenData() (*os.File, error) {
+	fn, err := f.getFilenameData()
+	if err != nil {
+		return nil, err
+	}
+	return os.Open(fn)
+}

@@ -1,4 +1,4 @@
-package views
+package highlight
 
 import (
 	"html/template"
@@ -14,16 +14,21 @@ var (
 		`<title>filebin — {{.GetFilename}}</title>
 `))
 	tmplDetails = template.Must(template.New("details").Parse(
-		`<strong>File:</strong> {{.GetFilename}} |
-<strong>Language:</strong> {{.GetLexer}} |
-<a href="/{{.GetId}}.txt">Plain text</a> |
-<a href="/download/{{.GetId}}">Download</a>
+		`<strong>File:</strong> {{.Fd.GetFilename}} |
+<strong>Language:</strong> {{.Lexer}} |
+<a href="/{{.Fd.GetId}}.txt">Plain text</a> |
+<a href="/download/{{.Fd.GetId}}">Download</a>
 <br>
 `))
 )
 
 func highlightFile(w http.ResponseWriter, fd *filedata.FileData) error {
-	_, err := io.WriteString(w, `<!DOCTYPE html>
+	lexer, err := highlight.GetLexer(fd.Mimetype)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.WriteString(w, `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -52,11 +57,24 @@ func highlightFile(w http.ResponseWriter, fd *filedata.FileData) error {
 		return err
 	}
 
-	if err := fd.GenerateHTML(w); err != nil {
+	fp, err := fd.OpenData()
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+
+	if err := highlight.GenerateHTML(w, fp, lexer); err != nil {
 		return err
 	}
 
-	if err := tmplDetails.Execute(w, fd); err != nil {
+	d := struct {
+		Fd    *filedata.FileData
+		Lexer string
+	}{
+		Fd:    fd,
+		Lexer: lexer.Config().Name,
+	}
+	if err := tmplDetails.Execute(w, d); err != nil {
 		return err
 	}
 

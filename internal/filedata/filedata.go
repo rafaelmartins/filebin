@@ -37,7 +37,6 @@ type FileData struct {
 	Mimetype  string    `json:"mimetype"`
 	Size      int64     `json:"size"`
 	Timestamp time.Time `json:"timestamp"`
-	lexer     *string
 }
 
 type byDate struct {

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rafaelmartins/filebin/internal/basicauth"
 	"github.com/rafaelmartins/filebin/internal/filedata"
+	"github.com/rafaelmartins/filebin/internal/highlight"
+	"github.com/rafaelmartins/filebin/internal/renderers"
 	"github.com/rafaelmartins/filebin/internal/settings"
 	"github.com/rafaelmartins/filebin/internal/utils"
 	"github.com/rafaelmartins/filebin/internal/version"
@@ -159,21 +160,12 @@ func File(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if fd.GetLexer() != "" {
-		if err := highlightFile(w, fd); err != nil {
-			utils.Error(w, err)
-		}
-		return
+	renderer, err := renderers.Lookup(fd.Mimetype)
+	if err != nil {
+		utils.Error(w, err)
 	}
 
-	w.Header().Set("Content-Type", fd.Mimetype)
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-
-	if !(strings.HasPrefix(fd.Mimetype, "audio/") || strings.HasPrefix(fd.Mimetype, "image/") || strings.HasPrefix(fd.Mimetype, "video/")) {
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fd.GetFilename()))
-	}
-
-	if err := fd.ServeData(w, r); err != nil {
+	if err := renderer.Render(w, r, fd); err != nil {
 		utils.Error(w, err)
 	}
 }
@@ -184,7 +176,8 @@ func FileText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if fd.GetLexer() == "" {
+	lexer, err := highlight.GetLexer(fd.Mimetype)
+	if err != nil || lexer == nil {
 		utils.ErrorBadRequest(w)
 		return
 	}
