@@ -6,7 +6,9 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,8 +26,9 @@ var (
 )
 
 type registry struct {
-	data map[string]*FileData
-	m    sync.RWMutex
+	data      map[string]*FileData
+	dataslice []*FileData
+	m         sync.RWMutex
 }
 
 type FileData struct {
@@ -35,6 +38,75 @@ type FileData struct {
 	Size      int64     `json:"size"`
 	Timestamp time.Time `json:"timestamp"`
 	lexer     *string
+}
+
+type byDate struct {
+	data []*FileData
+}
+
+func (b *byDate) Len() int {
+	return len(b.data)
+}
+
+func (b *byDate) Swap(i int, j int) {
+	b.data[i], b.data[j] = b.data[j], b.data[i]
+}
+
+func (b *byDate) Less(i int, j int) bool {
+	return b.data[i].Timestamp.UnixNano() < b.data[j].Timestamp.UnixNano()
+}
+
+func Init() error {
+	s, err := settings.Get()
+	if err != nil {
+		return err
+	}
+
+	firstDir := true
+	if err := filepath.Walk(s.StorageDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			if firstDir {
+				firstDir = false
+				return nil
+			}
+			return filepath.SkipDir
+		}
+
+		if filepath.Ext(path) != ".json" {
+			return nil
+		}
+
+		filename := filepath.Base(path)
+		id := filename[:len(filename)-5]
+
+		fd := &FileData{
+			id: id,
+		}
+
+		if err := fd.readJSON(); err != nil {
+			return err
+		}
+
+		reg.m.Lock()
+		defer reg.m.Unlock()
+		reg.data[fd.id] = fd
+		reg.dataslice = append(reg.dataslice, fd)
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	reg.m.Lock()
+	defer reg.m.Unlock()
+
+	sort.Sort(&byDate{reg.dataslice})
+
+	return nil
 }
 
 func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileData, error) {
@@ -83,6 +155,7 @@ func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileDat
 	reg.m.Lock()
 	defer reg.m.Unlock()
 	reg.data[fd.id] = fd
+	reg.dataslice = append(reg.dataslice, fd)
 
 	return fd, nil
 }
@@ -137,24 +210,22 @@ func NewFromRequest(r *http.Request) ([]*FileData, error) {
 
 func NewFromId(id string) (*FileData, error) {
 	reg.m.RLock()
+	defer reg.m.RUnlock()
+
 	if fd, ok := reg.data[id]; ok {
-		reg.m.RUnlock()
 		return fd, nil
 	}
-	reg.m.RUnlock()
 
-	fd := &FileData{
-		id: id,
+	return nil, ErrNotFound
+}
+
+func ForEach(f func(*FileData)) {
+	reg.m.RLock()
+	defer reg.m.RUnlock()
+
+	for _, fd := range reg.dataslice {
+		f(fd)
 	}
-	if err := fd.readJSON(); err != nil {
-		return nil, err
-	}
-
-	reg.m.Lock()
-	defer reg.m.Unlock()
-	reg.data[fd.id] = fd
-
-	return fd, nil
 }
 
 func Delete(id string) error {
@@ -165,7 +236,16 @@ func Delete(id string) error {
 
 	reg.m.Lock()
 	defer reg.m.Unlock()
+
 	delete(reg.data, fd.id)
+
+	n := []*FileData{}
+	for _, v := range reg.dataslice {
+		if v.id != id {
+			n = append(n, v)
+		}
+	}
+	reg.dataslice = n
 
 	if err := fd.deleteJSON(); err != nil {
 		return err

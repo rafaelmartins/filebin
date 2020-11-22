@@ -87,6 +87,29 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func List(w http.ResponseWriter, r *http.Request) {
+	// authentication
+	if !basicauth.BasicAuth(w, r) {
+		return
+	}
+
+	baseUrl := ""
+	if s, err := settings.Get(); err == nil {
+		baseUrl = s.BaseUrl
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	filedata.ForEach(func(fd *filedata.FileData) {
+		if baseUrl != "" {
+			fmt.Fprintf(w, "%s: %s (%s) -> %s/%s\n", fd.Timestamp, fd.Filename, fd.Mimetype, baseUrl, fd.GetId())
+		} else {
+			fmt.Fprintf(w, "%s: %s (%s) -> %s\n", fd.Timestamp, fd.Filename, fd.Mimetype, fd.GetId())
+		}
+	})
+}
+
 func Delete(w http.ResponseWriter, r *http.Request) {
 	// authentication
 	if !basicauth.BasicAuth(w, r) {
