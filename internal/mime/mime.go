@@ -67,8 +67,7 @@ func Detect(f io.Reader, fh *multipart.FileHeader) (string, error) {
 		return "", errNotFound
 	}
 
-	if filepath.Ext(fh.Filename) != "" {
-		// files with extension can be easily matched without looking at the content
+	if fh.Filename != "-" {
 		if m, err := detectFromFilename(fh.Filename); err == nil && m != "" {
 			return m, nil
 		}
