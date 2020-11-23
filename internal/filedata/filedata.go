@@ -169,10 +169,7 @@ func NewFromRequest(r *http.Request) ([]*FileData, error) {
 		return nil, err
 	}
 
-	// we store all file data in memory, instead of letting the library use temp files.
-	// this is intended to be used as a private service, it should not be an issue.
-	size := int64(s.UploadMaxSizeMb) * 1024 * 1024
-	if err := r.ParseMultipartForm(size); err != nil {
+	if err := r.ParseMultipartForm(32 * 1024 * 1024); err != nil {
 		return nil, err
 	}
 
@@ -184,6 +181,8 @@ func NewFromRequest(r *http.Request) ([]*FileData, error) {
 	if len(fhs) == 0 {
 		return nil, errors.New("filedata: no files")
 	}
+
+	size := int64(s.UploadMaxSizeMb) * 1024 * 1024
 
 	fds := []*FileData{}
 	errl := []string{}
