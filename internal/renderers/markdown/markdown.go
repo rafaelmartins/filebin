@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"io"
 	"io/ioutil"
 	"net/http"
 
@@ -42,5 +43,22 @@ func (h *MarkdownRenderer) Render(w http.ResponseWriter, r *http.Request, fd *fi
 	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	return md.Convert(src, w)
+	_, err = io.WriteString(w, `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+<body>
+`)
+	if err != nil {
+		return err
+	}
+
+	if err := md.Convert(src, w); err != nil {
+		return err
+	}
+
+	_, err = io.WriteString(w, `</body>
+</html>`)
+	return err
 }
