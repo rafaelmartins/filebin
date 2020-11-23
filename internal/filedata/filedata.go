@@ -268,7 +268,7 @@ func (f *FileData) GetFilename() string {
 		}
 
 		// try to find a file extension
-		fn += mime.GetExtension(f.Mimetype)
+		fn += mime.GetExtension(f.Mimetype, f.Filename)
 		return fn
 	}
 	return f.Filename

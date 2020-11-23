@@ -88,11 +88,17 @@ func Detect(f io.Reader, fh *multipart.FileHeader) (string, error) {
 	return "", errNotFound
 }
 
-func GetExtension(mimetype string) string {
+func GetExtension(mimetype string, filename string) string {
+	fn := filepath.Base(filename)
 	for _, m := range registry {
 		if m.name == mimetype {
 			if len(m.patterns) == 0 {
 				continue
+			}
+			for _, p := range m.patterns {
+				if fn == p {
+					return ""
+				}
 			}
 			for _, p := range m.patterns {
 				if ext := filepath.Ext(p); ext != "" && !strings.Contains(ext, "*") {
