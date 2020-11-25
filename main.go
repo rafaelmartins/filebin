@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -23,6 +24,24 @@ func usage(err error) {
 	os.Exit(0)
 }
 
+func logHandler(w io.Writer, params handlers.LogFormatterParams) {
+	uri := params.Request.RequestURI
+	if params.Request.ProtoMajor == 2 && params.Request.Method == "CONNECT" {
+		uri = params.Request.Host
+	}
+	if uri == "" {
+		uri = params.URL.RequestURI()
+	}
+
+	fmt.Fprintf(w, "[%s] %s %q %d %d\n",
+		params.TimeStamp.UTC().Format("2006-01-02 15:04:05 MST"),
+		params.Request.Method,
+		uri,
+		params.StatusCode,
+		params.Size,
+	)
+}
+
 func main() {
 	s, err := settings.Get()
 	if err != nil {
@@ -39,6 +58,9 @@ func main() {
 	r.HandleFunc("/{id}", views.Delete).Methods("DELETE")
 	r.HandleFunc("/{id}", views.File)
 
+	h := handlers.CustomLoggingHandler(os.Stderr, r, logHandler)
+	h = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(h)
+
 	if err := magic.Init(); err != nil {
 		usage(err)
 	}
@@ -49,7 +71,7 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stderr, " * Listening on %s\n", s.ListenAddr)
-	if err := http.ListenAndServe(s.ListenAddr, handlers.LoggingHandler(os.Stderr, r)); err != nil {
+	if err := http.ListenAndServe(s.ListenAddr, h); err != nil {
 		usage(err)
 	}
 }
