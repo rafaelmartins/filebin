@@ -37,6 +37,7 @@ func (h *MarkdownRenderer) Render(w http.ResponseWriter, r *http.Request, fd *fi
 		),
 		goldmark.WithRendererOptions(
 			html.WithHardWraps(),
+			html.WithUnsafe(),
 		),
 	)
 
