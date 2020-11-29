@@ -16,6 +16,7 @@ var (
 	tmplDetails = template.Must(template.New("details").Parse(
 		`<strong>File:</strong> {{.Fd.GetFilename}} |
 <strong>Language:</strong> {{.Lexer}} |
+<strong>Created on:</strong> {{.Timestamp}} |
 <a href="/{{.Fd.GetId}}.txt">Plain text</a> |
 <a href="/download/{{.Fd.GetId}}">Download</a>
 <br>
@@ -41,7 +42,7 @@ func highlightFile(w http.ResponseWriter, fd *filedata.FileData) error {
 		return err
 	}
 
-	if _, err := io.WriteString(w, `<style type="text/css">`); err != nil {
+	if _, err := io.WriteString(w, "<style type=\"text/css\">\n"); err != nil {
 		return err
 	}
 
@@ -68,11 +69,13 @@ func highlightFile(w http.ResponseWriter, fd *filedata.FileData) error {
 	}
 
 	d := struct {
-		Fd    *filedata.FileData
-		Lexer string
+		Fd        *filedata.FileData
+		Lexer     string
+		Timestamp string
 	}{
-		Fd:    fd,
-		Lexer: lexer.Config().Name,
+		Fd:        fd,
+		Lexer:     lexer.Config().Name,
+		Timestamp: fd.Timestamp.Format("02-01-2006 15:04:05"),
 	}
 	if err := tmplDetails.Execute(w, d); err != nil {
 		return err
