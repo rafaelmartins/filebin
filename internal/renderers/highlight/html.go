@@ -18,7 +18,7 @@ var (
 <strong>Language:</strong> {{.Lexer}} |
 <strong>Created on:</strong> {{.Timestamp}} |
 <a href="/{{.Fd.GetId}}.txt">Plain text</a> |
-<a href="/download/{{.Fd.GetId}}">Download</a>
+<a href="/{{.Fd.GetId}}/download">Download</a>
 <br>
 `))
 )
