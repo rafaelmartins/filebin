@@ -69,6 +69,7 @@ var registry = []*mimeType{
 	{"application/x-turtle", []string{"*.ttl"}},
 	{"application/x-twig", []string{}},
 	{"application/x-vue", []string{"*.vue"}},
+	{"text/html", []string{"*.html", "*.htm", "*.xhtml", "*.xslt", "*.xht", "*.shtml"}}, // moved here because application/xhtml+xml defines the same extensions but text/html is preferred
 	{"application/xhtml+xml", []string{"*.html", "*.htm", "*.xhtml", "*.xslt", "*.xht", "*.shtml"}},
 	{"application/xml", []string{"*.xml", "*.xsl", "*.rss", "*.xslt", "*.xsd", "*.wsdl", "*.wsf", "*.svg", "*.svgz"}},
 	{"application/xml-dtd", []string{"*.dtd"}},
@@ -82,7 +83,6 @@ var registry = []*mimeType{
 	{"text/coffeescript", []string{"*.coffee"}},
 	{"text/css", []string{"*.css"}},
 	{"text/haxe", []string{"*.hx", "*.hxsl"}},
-	{"text/html", []string{"*.html", "*.htm", "*.xhtml", "*.xslt", "*.xht", "*.shtml"}},
 	{"text/html+genshi", []string{}},
 	{"text/inf", []string{"*.ini", "*.cfg", "*.inf", ".gitconfig", ".editorconfig"}},
 	{"text/ipf", []string{"*.ipf"}},
