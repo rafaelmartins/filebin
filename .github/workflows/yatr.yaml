@@ -10,6 +10,7 @@ jobs:
       matrix:
         target:
           - distcheck
+          - dist-linux-amd64
 
     steps:
       - name: Set up Go
