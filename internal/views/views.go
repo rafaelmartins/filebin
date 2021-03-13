@@ -182,9 +182,7 @@ func FileText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	if err := fd.ServeData(w, r); err != nil {
+	if err := fd.ServeData(w, r, "text/plain; charset=utf-8", fd.GetFilename(), false); err != nil {
 		utils.Error(w, err)
 	}
 }
@@ -195,10 +193,7 @@ func FileDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", fd.Mimetype)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fd.GetFilename()))
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	if err := fd.ServeData(w, r); err != nil {
+	if err := fd.ServeData(w, r, fd.Mimetype, fd.GetFilename(), true); err != nil {
 		utils.Error(w, err)
 	}
 }

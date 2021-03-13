@@ -70,7 +70,7 @@ func main() {
 		usage(err)
 	}
 
-	fmt.Fprintf(os.Stderr, " * Listening on %s\n", s.ListenAddr)
+	fmt.Fprintf(os.Stderr, " * Listening on %s (backend: %s)\n", s.ListenAddr, s.Backend.Name())
 	if err := http.ListenAndServe(s.ListenAddr, h); err != nil {
 		usage(err)
 	}

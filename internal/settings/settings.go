@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
+
+	"github.com/rafaelmartins/filebin/internal/filedata/backends"
 )
 
 var (
@@ -12,15 +15,23 @@ var (
 )
 
 type Settings struct {
-	AuthRealm       string
-	AuthUsername    string
-	AuthPassword    string
-	BaseUrl         string
-	HighlightStyle  string
-	IdLength        uint8
-	ListenAddr      string
-	StorageDir      string
-	UploadMaxSizeMb uint
+	AuthRealm         string
+	AuthUsername      string
+	AuthPassword      string
+	BaseUrl           string
+	HighlightStyle    string
+	IdLength          uint8
+	ListenAddr        string
+	S3AccessKeyId     string
+	S3SecretAccessKey string
+	S3SessionToken    string
+	S3Endpoint        string
+	S3Region          string
+	S3Bucket          string
+	S3PresignExpire   time.Duration
+	StorageDir        string
+	UploadMaxSizeMb   uint
+	Backend           backends.Backend
 }
 
 func getString(key string, def string, required bool) (string, error) {
@@ -98,20 +109,40 @@ func Get() (*Settings, error) {
 		return nil, err
 	}
 
-	s.StorageDir, err = getString("FILEBIN_STORAGE_DIR", "data", true)
+	s.S3AccessKeyId, err = getString("FILEBIN_S3_ACCESS_KEY_ID", "", false)
 	if err != nil {
 		return nil, err
 	}
-	st, err := os.Stat(s.StorageDir)
+
+	s.S3SecretAccessKey, err = getString("FILEBIN_S3_SECRET_ACCESS_KEY", "", false)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-		if err := os.MkdirAll(s.StorageDir, 0777); err != nil {
-			return nil, err
-		}
-	} else if !st.IsDir() {
-		return nil, errors.New("FILEBIN_STORAGE_DIR is not a directory")
+		return nil, err
+	}
+
+	s.S3Endpoint, err = getString("FILEBIN_S3_ENDPOINT", "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	s.S3Region, err = getString("FILEBIN_S3_REGION", "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	s.S3Bucket, err = getString("FILEBIN_S3_BUCKET", "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	s3PresignExpireMinutes, err := getUint("FILEBIN_S3_PRESIGN_EXPIRE_MINUTES", 5, true, 10, 0)
+	if err != nil {
+		return nil, err
+	}
+	s.S3PresignExpire = time.Duration(s3PresignExpireMinutes) * time.Minute
+
+	s.StorageDir, err = getString("FILEBIN_STORAGE_DIR", "", false)
+	if err != nil {
+		return nil, err
 	}
 
 	uploadMaxSizeMb, err := getUint("FILEBIN_UPLOAD_MAX_SIZE_MB", 10, true, 10, 0)
@@ -122,6 +153,11 @@ func Get() (*Settings, error) {
 		return nil, errors.New("FILEBIN_UPLOAD_MAX_SIZE_MB must be > 0")
 	}
 	s.UploadMaxSizeMb = uint(uploadMaxSizeMb)
+
+	s.Backend, err = backends.Lookup(s.StorageDir, s.S3AccessKeyId, s.S3SecretAccessKey, s.S3Endpoint, s.S3Region, s.S3Bucket, s.S3PresignExpire)
+	if err != nil {
+		return nil, err
+	}
 
 	settings = s
 

@@ -19,8 +19,7 @@ import (
 )
 
 var (
-	ErrDuplicated = errors.New("models: duplicated")
-	ErrNotFound   = errors.New("models: not found")
+	ErrNotFound = errors.New("filedata: not found")
 
 	reg = &registry{data: map[string]*FileData{}}
 )
@@ -61,43 +60,27 @@ func Init() error {
 		return err
 	}
 
-	firstDir := true
-	if err := filepath.Walk(s.StorageDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	ids, err := s.Backend.List()
+	if err != nil {
+		return err
+	}
 
-		if info.IsDir() {
-			if firstDir {
-				firstDir = false
-				return nil
-			}
-			return filepath.SkipDir
-		}
-
-		if filepath.Ext(path) != ".json" {
-			return nil
-		}
-
-		filename := filepath.Base(path)
-		id := filename[:len(filename)-5]
-
+	for _, id := range ids {
 		fd := &FileData{
 			id: id,
 		}
 
-		if err := fd.readJSON(); err != nil {
+		if err := s.Backend.ReadJSON(fd.id, fd); err != nil {
+			if os.IsNotExist(err) {
+				return ErrNotFound
+			}
 			return err
 		}
 
 		reg.m.Lock()
-		defer reg.m.Unlock()
 		reg.data[fd.id] = fd
 		reg.dataslice = append(reg.dataslice, fd)
-
-		return nil
-	}); err != nil {
-		return err
+		reg.m.Unlock()
 	}
 
 	reg.m.Lock()
@@ -109,6 +92,11 @@ func Init() error {
 }
 
 func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileData, error) {
+	s, err := settings.Get()
+	if err != nil {
+		return nil, err
+	}
+
 	f, err := fh.Open()
 	defer f.Close()
 
@@ -138,8 +126,9 @@ func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileDat
 		if err != nil {
 			return nil, err
 		}
-		if err := fd.writeJSON(); err != nil {
-			if err != ErrDuplicated {
+
+		if err := s.Backend.WriteJSON(fd.id, fd); err != nil {
+			if !os.IsExist(err) {
 				return nil, err
 			}
 		} else {
@@ -147,8 +136,17 @@ func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileDat
 		}
 	}
 
-	if err := fd.writeData(f); err != nil {
+	n, err := s.Backend.WriteData(fd.id, f)
+	if err != nil {
+		s.Backend.DeleteData(fd.id)
 		return nil, err
+	}
+	if n != fh.Size {
+		s.Backend.DeleteData(fd.id)
+		if n < fh.Size {
+			return nil, errors.New("filedata: write: unexpected eof")
+		}
+		return nil, errors.New("filedata: write: mismatched file size")
 	}
 
 	reg.m.Lock()
@@ -227,6 +225,11 @@ func ForEach(f func(*FileData)) {
 }
 
 func Delete(id string) error {
+	s, err := settings.Get()
+	if err != nil {
+		return err
+	}
+
 	fd, err := NewFromId(id)
 	if err != nil {
 		return err
@@ -245,11 +248,11 @@ func Delete(id string) error {
 	}
 	reg.dataslice = n
 
-	if err := fd.deleteJSON(); err != nil {
+	if err := s.Backend.DeleteJSON(fd.id); err != nil {
 		return err
 	}
 
-	return fd.deleteData()
+	return s.Backend.DeleteData(fd.id)
 }
 
 func (f *FileData) GetId() string {
@@ -271,4 +274,22 @@ func (f *FileData) GetFilename() string {
 		return fn
 	}
 	return f.Filename
+}
+
+func (f *FileData) ServeData(w http.ResponseWriter, r *http.Request, contentType string, filename string, attachment bool) error {
+	s, err := settings.Get()
+	if err != nil {
+		return err
+	}
+
+	return s.Backend.ServeData(w, r, f.id, contentType, filename, attachment)
+}
+
+func (f *FileData) OpenData() (io.ReadCloser, error) {
+	s, err := settings.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	return s.Backend.OpenData(f.id)
 }
