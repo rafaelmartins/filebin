@@ -6,3 +6,5 @@ targets:
     distcheck:
         task_args:
             - ./...
+    static-dist-linux-amd64:
+        task_script: build-aux/build-static.sh

@@ -10,6 +10,7 @@ jobs:
       matrix:
         target:
           - distcheck
+          - static-dist-linux-amd64
 
     steps:
       - name: Set up Go
@@ -25,4 +26,8 @@ jobs:
           CGO_ENABLED: "1"
           TARGET: "${{ matrix.target }}"
           DISTFILES_URL: "${{ secrets.DISTFILES_URL }}"
-        run: curl -sSf https://yatr.rgm.io/run.sh | bash
+        run: |
+          if [[ "x${{ matrix.target }}" = xstatic-dist-* ]]; then
+              sudo apt-get install -y musl-tools
+          fi
+          curl -sSf https://yatr.rgm.io/run.sh | bash
