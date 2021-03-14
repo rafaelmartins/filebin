@@ -2,6 +2,7 @@ package magic
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"sync"
 	"unsafe"
@@ -9,6 +10,7 @@ import (
 
 // #cgo LDFLAGS: -lmagic
 // #include <magic.h>
+// #include <stdlib.h>
 import "C"
 
 var (
@@ -37,7 +39,14 @@ func Init() error {
 		return errors.New("magic: failed to open")
 	}
 
-	if rv := C.magic_load(cookie, nil); rv != 0 {
+	// if we have "magic.mgc" in the current dir (e.g. from static build), use it
+	var mgc *C.char
+	if _, err := os.Stat("magic.mgc"); err == nil {
+		mgc = C.CString("magic.mgc")
+		defer C.free(unsafe.Pointer(mgc))
+	}
+
+	if rv := C.magic_load(cookie, mgc); rv != 0 {
 		err := getError()
 		C.magic_close(cookie)
 		return err
