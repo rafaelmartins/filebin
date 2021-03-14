@@ -28,10 +28,10 @@ ${MAKE_CMD} -j1 \
 
 popd > /dev/null
 
-rm -rf "${BUILDDIR}/${P}"
-mkdir -p "${BUILDDIR}/${P}"
+rm -rf "${BUILDDIR}/${PN}-static-linux-amd64-${PV}"
+mkdir -p "${BUILDDIR}/${PN}-static-linux-amd64-${PV}"
 
-pushd "${BUILDDIR}/${P}" > /dev/null
+pushd "${BUILDDIR}/${PN}-static-linux-amd64-${PV}" > /dev/null
 go build "${@}" "${SRCDIR}"
 cp "${BUILDDIR}/file-${FILE_PV}/magic/magic.mgc" .
 cp "${BUILDDIR}/file-${FILE_PV}/COPYING" LICENSE-libmagic
@@ -40,4 +40,4 @@ popd > /dev/null
 
 rm -f "file-${FILE_PV}.tar.gz"
 
-tar -cvJf "${P}.tar.xz" "${P}"
+tar -cvJf "${PN}-static-linux-amd64-${PV}.tar.xz" "${PN}-static-linux-amd64-${PV}"
