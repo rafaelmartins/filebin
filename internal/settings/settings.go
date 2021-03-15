@@ -29,6 +29,7 @@ type Settings struct {
 	S3Region          string
 	S3Bucket          string
 	S3PresignExpire   time.Duration
+	S3ProxyData       bool
 	StorageDir        string
 	UploadMaxSizeMb   uint
 	Backend           backends.Backend
@@ -58,6 +59,18 @@ func getUint(key string, def uint64, required bool, base int, bitSize int) (uint
 	}
 	if required && v2 == 0 {
 		return 0, fmt.Errorf("settings: %s empty", key)
+	}
+	return v2, nil
+}
+
+func getBool(key string, def bool) (bool, error) {
+	v, err := getString(key, strconv.FormatBool(def), true)
+	if err != nil {
+		return false, err
+	}
+	v2, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, err
 	}
 	return v2, nil
 }
@@ -140,6 +153,11 @@ func Get() (*Settings, error) {
 	}
 	s.S3PresignExpire = time.Duration(s3PresignExpireMinutes) * time.Minute
 
+	s.S3ProxyData, err = getBool("FILEBIN_S3_PROXY_DATA", false)
+	if err != nil {
+		return nil, err
+	}
+
 	s.StorageDir, err = getString("FILEBIN_STORAGE_DIR", "", false)
 	if err != nil {
 		return nil, err
@@ -154,7 +172,16 @@ func Get() (*Settings, error) {
 	}
 	s.UploadMaxSizeMb = uint(uploadMaxSizeMb)
 
-	s.Backend, err = backends.Lookup(s.StorageDir, s.S3AccessKeyId, s.S3SecretAccessKey, s.S3Endpoint, s.S3Region, s.S3Bucket, s.S3PresignExpire)
+	s.Backend, err = backends.Lookup(
+		s.StorageDir,
+		s.S3AccessKeyId,
+		s.S3SecretAccessKey,
+		s.S3Endpoint,
+		s.S3Region,
+		s.S3Bucket,
+		s.S3PresignExpire,
+		s.S3ProxyData,
+	)
 	if err != nil {
 		return nil, err
 	}

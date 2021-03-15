@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"time"
@@ -21,9 +22,10 @@ type S3 struct {
 	c      *s3.S3
 	bucket string
 	expire time.Duration
+	proxy  bool
 }
 
-func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration) *S3 {
+func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration, s3ProxyData bool) *S3 {
 	conf := &aws.Config{
 		Credentials: credentials.NewStaticCredentials(s3AccessKeyId, s3SecretAccessKey, ""),
 		Endpoint:    aws.String(s3Endpoint),
@@ -33,6 +35,7 @@ func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3
 		c:      s3.New(session.New(conf)),
 		bucket: s3Bucket,
 		expire: s3PresignExpire,
+		proxy:  s3ProxyData,
 	}
 }
 
@@ -167,7 +170,158 @@ func (s *S3) DeleteData(id string) error {
 	return err
 }
 
-func (s *S3) ServeData(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+	conf := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(id),
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-Match")]; ok && len(v) > 0 {
+		conf.IfMatch = aws.String(v[0])
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-Modified-Since")]; ok && len(v) > 0 {
+		if t, err := http.ParseTime(v[0]); err == nil {
+			conf.IfModifiedSince = aws.Time(t)
+		}
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-None-Match")]; ok && len(v) > 0 {
+		conf.IfNoneMatch = aws.String(v[0])
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-Unmodified-Since")]; ok && len(v) > 0 {
+		if t, err := http.ParseTime(v[0]); err == nil {
+			conf.IfUnmodifiedSince = aws.Time(t)
+		}
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("Range")]; ok && len(v) > 0 {
+		conf.Range = aws.String(v[0])
+	}
+
+	req, o := s.c.HeadObjectRequest(conf)
+	if err := req.Send(); err != nil {
+		if _, ok := err.(awserr.RequestFailure); !ok {
+			return err
+		}
+	}
+
+	if v := o.AcceptRanges; v != nil && *v != "" {
+		w.Header().Set("Accept-Ranges", *v)
+	}
+	if v := o.CacheControl; v != nil && *v != "" {
+		w.Header().Set("Cache-Control", *v)
+	}
+	if v := o.ContentEncoding; v != nil && *v != "" {
+		w.Header().Set("Content-Encoding", *v)
+	}
+	if v := o.ContentLanguage; v != nil && *v != "" {
+		w.Header().Set("Content-Language", *v)
+	}
+	if v := o.ContentLength; v != nil && *v > 0 {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", *v))
+	}
+	if v := o.ETag; v != nil && *v != "" {
+		w.Header().Set("ETag", *v)
+	}
+	if v := o.LastModified; v != nil && !(*v).IsZero() {
+		w.Header().Set("Last-Modified", (*v).UTC().Format(http.TimeFormat))
+	}
+
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+	if filename != "" {
+		if attachment {
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+		} else {
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
+		}
+	}
+
+	w.WriteHeader(req.HTTPResponse.StatusCode)
+	return nil
+}
+
+func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+	conf := &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(id),
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-Match")]; ok && len(v) > 0 {
+		conf.IfMatch = aws.String(v[0])
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-Modified-Since")]; ok && len(v) > 0 {
+		if t, err := http.ParseTime(v[0]); err == nil {
+			conf.IfModifiedSince = aws.Time(t)
+		}
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-None-Match")]; ok && len(v) > 0 {
+		conf.IfNoneMatch = aws.String(v[0])
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("If-Unmodified-Since")]; ok && len(v) > 0 {
+		if t, err := http.ParseTime(v[0]); err == nil {
+			conf.IfUnmodifiedSince = aws.Time(t)
+		}
+	}
+	if v, ok := r.Header[textproto.CanonicalMIMEHeaderKey("Range")]; ok && len(v) > 0 {
+		conf.Range = aws.String(v[0])
+	}
+
+	req, o := s.c.GetObjectRequest(conf)
+	if err := req.Send(); err != nil {
+		if _, ok := err.(awserr.RequestFailure); !ok {
+			return err
+		}
+	}
+
+	if v := o.AcceptRanges; v != nil && *v != "" {
+		w.Header().Set("Accept-Ranges", *v)
+	}
+	if v := o.CacheControl; v != nil && *v != "" {
+		w.Header().Set("Cache-Control", *v)
+	}
+	if v := o.ContentEncoding; v != nil && *v != "" {
+		w.Header().Set("Content-Encoding", *v)
+	}
+	if v := o.ContentLanguage; v != nil && *v != "" {
+		w.Header().Set("Content-Language", *v)
+	}
+	if v := o.ContentLength; v != nil && *v > 0 {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", *v))
+	}
+	if v := o.ContentRange; v != nil && *v != "" {
+		w.Header().Set("Content-Range", *v)
+	}
+	if v := o.ETag; v != nil && *v != "" {
+		w.Header().Set("ETag", *v)
+	}
+	if v := o.Expires; v != nil && *v != "" {
+		w.Header().Set("Expires", *v)
+	}
+	if v := o.LastModified; v != nil && !(*v).IsZero() {
+		w.Header().Set("Last-Modified", (*v).UTC().Format(http.TimeFormat))
+	}
+
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+	if filename != "" {
+		if attachment {
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+		} else {
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
+		}
+	}
+
+	w.WriteHeader(req.HTTPResponse.StatusCode)
+
+	if v := o.ContentLength; v != nil && *v > 0 {
+		io.CopyN(w, o.Body, *o.ContentLength)
+	} else {
+		io.Copy(w, o.Body)
+	}
+
+	return o.Body.Close()
+}
+
+func (s *S3) redirectDataGet(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
 	conf := &s3.GetObjectInput{
 		Bucket:              aws.String(s.bucket),
 		Key:                 aws.String(id),
@@ -187,6 +341,24 @@ func (s *S3) ServeData(w http.ResponseWriter, r *http.Request, id string, conten
 		return err
 	}
 
-	http.Redirect(w, r, requrl, 302)
+	http.Redirect(w, r, requrl, http.StatusFound)
 	return nil
+}
+
+func (s *S3) ServeData(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+	switch r.Method {
+	case http.MethodHead:
+		// HEAD requests are always proxied
+		return s.serveDataHead(w, r, id, contentType, filename, attachment)
+
+	case http.MethodGet:
+		if s.proxy {
+			return s.serveDataGet(w, r, id, contentType, filename, attachment)
+		}
+		return s.redirectDataGet(w, r, id, contentType, filename, attachment)
+
+	default:
+		http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+		return nil
+	}
 }
