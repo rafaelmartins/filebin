@@ -91,7 +91,7 @@ func Init() error {
 	return nil
 }
 
-func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileData, error) {
+func processFile(fh *multipart.FileHeader) (*FileData, error) {
 	s, err := settings.Get()
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileDat
 	f, err := fh.Open()
 	defer f.Close()
 
-	if fh.Size > size {
+	if fh.Size > int64(s.UploadMaxSizeMb)*1024*1024 {
 		return nil, errors.New("filedata: uploaded file bigger than allowed size")
 	}
 
@@ -122,7 +122,7 @@ func processFile(fh *multipart.FileHeader, size int64, idLength uint8) (*FileDat
 
 	for {
 		var err error
-		fd.id, err = id.Generate(idLength)
+		fd.id, err = id.Generate(s.IdLength)
 		if err != nil {
 			return nil, err
 		}
@@ -162,11 +162,6 @@ func NewFromRequest(r *http.Request) ([]*FileData, error) {
 		return nil, errors.New("filedata: nil request")
 	}
 
-	s, err := settings.Get()
-	if err != nil {
-		return nil, err
-	}
-
 	if err := r.ParseMultipartForm(32 * 1024 * 1024); err != nil {
 		return nil, err
 	}
@@ -180,12 +175,10 @@ func NewFromRequest(r *http.Request) ([]*FileData, error) {
 		return nil, errors.New("filedata: no files")
 	}
 
-	size := int64(s.UploadMaxSizeMb) * 1024 * 1024
-
 	fds := []*FileData{}
 	errl := []string{}
 	for i, fh := range fhs {
-		fd, err := processFile(fh, size, s.IdLength)
+		fd, err := processFile(fh)
 		if err != nil {
 			fds = append(fds, nil)
 			errl = append(errl, fmt.Sprintf("%d: %s", i, err.Error()))
@@ -194,6 +187,7 @@ func NewFromRequest(r *http.Request) ([]*FileData, error) {
 		fds = append(fds, fd)
 	}
 
+	var err error
 	if len(errl) > 0 {
 		err = errors.New(strings.Join(errl, " | "))
 	}

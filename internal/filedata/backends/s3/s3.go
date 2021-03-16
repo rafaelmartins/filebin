@@ -61,8 +61,7 @@ func (s *S3) List() ([]string, error) {
 	rv := []string{}
 	if err := s.c.ListObjectsPages(conf, func(fl *s3.ListObjectsOutput, last bool) bool {
 		for _, f := range fl.Contents {
-			k := *f.Key
-			if filepath.Ext(k) == ".json" {
+			if k := *f.Key; filepath.Ext(k) == ".json" {
 				rv = append(rv, k[:len(k)-5])
 			}
 		}
