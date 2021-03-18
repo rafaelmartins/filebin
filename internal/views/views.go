@@ -1,6 +1,7 @@
 package views
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -194,6 +195,17 @@ func FileDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := fd.ServeData(w, r, fd.Mimetype, fd.GetFilename(), true); err != nil {
+		utils.Error(w, err)
+	}
+}
+
+func FileJSON(w http.ResponseWriter, r *http.Request) {
+	fd := getFile(w, r)
+	if fd == nil {
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := json.NewEncoder(w).Encode(fd); err != nil {
 		utils.Error(w, err)
 	}
 }
