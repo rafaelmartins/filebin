@@ -58,7 +58,7 @@ func highlightFile(w http.ResponseWriter, fd *filedata.FileData) error {
 		return err
 	}
 
-	fp, err := fd.OpenData()
+	fp, err := fd.Read()
 	if err != nil {
 		return err
 	}

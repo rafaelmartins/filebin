@@ -54,6 +54,36 @@ func (b *byDate) Less(i int, j int) bool {
 	return b.data[i].Timestamp.UnixNano() < b.data[j].Timestamp.UnixNano()
 }
 
+func newfd(id string) (*FileData, error) {
+	s, err := settings.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	filename, mimetype, size, timestamp, err := s.Backend.ReadMetadata(id)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	fd := &FileData{
+		id:        id,
+		Filename:  filename,
+		Mimetype:  mimetype,
+		Size:      size,
+		Timestamp: timestamp,
+	}
+
+	reg.m.Lock()
+	reg.data[fd.id] = fd
+	reg.dataslice = append(reg.dataslice, fd)
+	reg.m.Unlock()
+
+	return fd, nil
+}
+
 func Init() error {
 	s, err := settings.Get()
 	if err != nil {
@@ -66,21 +96,9 @@ func Init() error {
 	}
 
 	for _, id := range ids {
-		fd := &FileData{
-			id: id,
-		}
-
-		if err := s.Backend.ReadJSON(fd.id, fd); err != nil {
-			if os.IsNotExist(err) {
-				return ErrNotFound
-			}
+		if _, err := newfd(id); err != nil {
 			return err
 		}
-
-		reg.m.Lock()
-		reg.data[fd.id] = fd
-		reg.dataslice = append(reg.dataslice, fd)
-		reg.m.Unlock()
 	}
 
 	reg.m.Lock()
@@ -113,22 +131,24 @@ func processFile(fh *multipart.FileHeader) (*FileData, error) {
 		return nil, err
 	}
 
-	fd := &FileData{
-		Filename:  fh.Filename,
-		Mimetype:  m,
-		Size:      fh.Size,
-		Timestamp: time.Now().UTC(),
-	}
+	var (
+		fid string
+		n   int64
+	)
 
 	for {
 		var err error
-		fd.id, err = id.Generate(s.IdLength)
+		fid, err = id.Generate(s.IdLength)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := s.Backend.WriteJSON(fd.id, fd); err != nil {
+		n, err = s.Backend.Write(fid, f, fh.Filename, m)
+		if err != nil {
 			if !os.IsExist(err) {
+				return nil, err
+			}
+			if _, err := f.Seek(0, io.SeekStart); err != nil {
 				return nil, err
 			}
 		} else {
@@ -136,25 +156,15 @@ func processFile(fh *multipart.FileHeader) (*FileData, error) {
 		}
 	}
 
-	n, err := s.Backend.WriteData(fd.id, f)
-	if err != nil {
-		s.Backend.DeleteData(fd.id)
-		return nil, err
-	}
 	if n != fh.Size {
-		s.Backend.DeleteData(fd.id)
+		s.Backend.Delete(fid)
 		if n < fh.Size {
 			return nil, errors.New("filedata: write: unexpected eof")
 		}
 		return nil, errors.New("filedata: write: mismatched file size")
 	}
 
-	reg.m.Lock()
-	defer reg.m.Unlock()
-	reg.data[fd.id] = fd
-	reg.dataslice = append(reg.dataslice, fd)
-
-	return fd, nil
+	return newfd(fid)
 }
 
 func NewFromRequest(r *http.Request) ([]*FileData, error) {
@@ -242,11 +252,7 @@ func Delete(id string) error {
 	}
 	reg.dataslice = n
 
-	if err := s.Backend.DeleteJSON(fd.id); err != nil {
-		return err
-	}
-
-	return s.Backend.DeleteData(fd.id)
+	return s.Backend.Delete(fd.id)
 }
 
 func (f *FileData) GetId() string {
@@ -270,20 +276,20 @@ func (f *FileData) GetFilename() string {
 	return f.Filename
 }
 
-func (f *FileData) ServeData(w http.ResponseWriter, r *http.Request, contentType string, filename string, attachment bool) error {
+func (f *FileData) Serve(w http.ResponseWriter, r *http.Request, filename string, mimetype string, attachment bool) error {
 	s, err := settings.Get()
 	if err != nil {
 		return err
 	}
 
-	return s.Backend.ServeData(w, r, f.id, contentType, filename, attachment)
+	return s.Backend.Serve(w, r, f.id, filename, mimetype, attachment)
 }
 
-func (f *FileData) OpenData() (io.ReadCloser, error) {
+func (f *FileData) Read() (io.ReadCloser, error) {
 	s, err := settings.Get()
 	if err != nil {
 		return nil, err
 	}
 
-	return s.Backend.OpenData(f.id)
+	return s.Backend.Read(f.id)
 }

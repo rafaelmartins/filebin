@@ -9,10 +9,17 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Local struct {
 	dir string
+}
+
+type metadata struct {
+	Filename  string    `json:"filename"`
+	Mimetype  string    `json:"mimetype"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 func NewLocal(dir string) (*Local, error) {
@@ -54,17 +61,31 @@ func (l *Local) List() ([]string, error) {
 	return rv, nil
 }
 
-func (l *Local) ReadJSON(id string, v interface{}) error {
+func (l *Local) Read(id string) (io.ReadCloser, error) {
+	return os.Open(filepath.Join(l.dir, id))
+}
+
+func (l *Local) ReadMetadata(id string) (string, string, int64, time.Time, error) {
 	fn := filepath.Join(l.dir, id+".json")
 	fp, err := os.Open(fn)
 	if err != nil {
-		return err
+		return "", "", 0, time.Time{}, err
 	}
 	defer fp.Close()
-	return json.NewDecoder(fp).Decode(v)
+
+	v := &metadata{}
+	if err := json.NewDecoder(fp).Decode(v); err != nil {
+		return "", "", 0, time.Time{}, err
+	}
+
+	st, err := os.Stat(filepath.Join(l.dir, id))
+	if err != nil {
+		return "", "", 0, time.Time{}, err
+	}
+	return v.Filename, v.Mimetype, st.Size(), v.Timestamp, nil
 }
 
-func (l *Local) WriteJSON(id string, v interface{}) error {
+func (l *Local) writeJSON(id string, v *metadata) error {
 	fn := filepath.Join(l.dir, id+".json")
 	fp, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
@@ -74,31 +95,48 @@ func (l *Local) WriteJSON(id string, v interface{}) error {
 	return json.NewEncoder(fp).Encode(v)
 }
 
-func (l *Local) DeleteJSON(id string) error {
+func (l *Local) deleteJSON(id string) error {
 	return os.Remove(filepath.Join(l.dir, id+".json"))
 }
 
-func (l *Local) OpenData(id string) (io.ReadCloser, error) {
-	return os.Open(filepath.Join(l.dir, id))
-}
+func (l *Local) Write(id string, r io.ReadSeeker, filename string, mimetype string) (int64, error) {
+	v := &metadata{
+		Filename:  filename,
+		Mimetype:  mimetype,
+		Timestamp: time.Now().UTC(),
+	}
+	if err := l.writeJSON(id, v); err != nil {
+		return 0, err
+	}
 
-func (l *Local) WriteData(id string, r io.ReadSeeker) (int64, error) {
 	fn := filepath.Join(l.dir, id)
 	fp, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
+		l.deleteJSON(id)
 		return 0, err
 	}
 	defer fp.Close()
 	return io.Copy(fp, r)
 }
 
-func (l *Local) DeleteData(id string) error {
-	return os.Remove(filepath.Join(l.dir, id))
+func (l *Local) Delete(id string) error {
+	err1 := l.deleteJSON(id)
+	err2 := os.Remove(filepath.Join(l.dir, id))
+	if err1 != nil && err2 != nil {
+		return errors.New(err1.Error() + " | " + err2.Error())
+	}
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
 }
 
-func (l *Local) ServeData(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+func (l *Local) Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
 	fn := filepath.Join(l.dir, id)
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", mimetype)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if filename != "" {
 		if attachment {

@@ -183,7 +183,7 @@ func FileText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := fd.ServeData(w, r, "text/plain; charset=utf-8", fd.GetFilename(), false); err != nil {
+	if err := fd.Serve(w, r, fd.GetFilename(), "text/plain; charset=utf-8", false); err != nil {
 		utils.Error(w, err)
 	}
 }
@@ -194,7 +194,7 @@ func FileDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := fd.ServeData(w, r, fd.Mimetype, fd.GetFilename(), true); err != nil {
+	if err := fd.Serve(w, r, fd.GetFilename(), fd.Mimetype, true); err != nil {
 		utils.Error(w, err)
 	}
 }

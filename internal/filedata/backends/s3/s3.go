@@ -1,14 +1,12 @@
 package s3
 
 import (
-	"bytes"
-	"encoding/json"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
 	"net/textproto"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -61,8 +59,8 @@ func (s *S3) List() ([]string, error) {
 	rv := []string{}
 	if err := s.c.ListObjectsPages(conf, func(fl *s3.ListObjectsOutput, last bool) bool {
 		for _, f := range fl.Contents {
-			if k := *f.Key; filepath.Ext(k) == ".json" {
-				rv = append(rv, k[:len(k)-5])
+			if k := f.Key; k != nil {
+				rv = append(rv, *k)
 			}
 		}
 		return true
@@ -73,57 +71,7 @@ func (s *S3) List() ([]string, error) {
 	return rv, nil
 }
 
-func (s *S3) ReadJSON(id string, v interface{}) error {
-	conf := &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(id + ".json"),
-	}
-
-	res, err := s.c.GetObject(conf)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			if aerr.Code() == s3.ErrCodeNoSuchKey {
-				return os.ErrNotExist
-			}
-		}
-		return err
-	}
-	defer res.Body.Close()
-
-	return json.NewDecoder(res.Body).Decode(v)
-}
-
-func (s *S3) WriteJSON(id string, v interface{}) error {
-	if s.keyExists(id + ".json") {
-		return os.ErrExist
-	}
-
-	data, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	conf := &s3.PutObjectInput{
-		Body:   bytes.NewReader(data),
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(id + ".json"),
-	}
-
-	_, err = s.c.PutObject(conf)
-	return err
-}
-
-func (s *S3) DeleteJSON(id string) error {
-	conf := &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(id + ".json"),
-	}
-
-	_, err := s.c.DeleteObject(conf)
-	return err
-}
-
-func (s *S3) OpenData(id string) (io.ReadCloser, error) {
+func (s *S3) Read(id string) (io.ReadCloser, error) {
 	conf := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(id),
@@ -141,15 +89,72 @@ func (s *S3) OpenData(id string) (io.ReadCloser, error) {
 	return res.Body, nil
 }
 
-func (s *S3) WriteData(id string, r io.ReadSeeker) (int64, error) {
+func (s *S3) ReadMetadata(id string) (string, string, int64, time.Time, error) {
+	conf := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(id),
+	}
+
+	res, err := s.c.HeadObject(conf)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() == s3.ErrCodeNoSuchKey {
+				return "", "", 0, time.Time{}, os.ErrNotExist
+			}
+		}
+		return "", "", 0, time.Time{}, err
+	}
+
+	filename := ""
+	if v, ok := res.Metadata[textproto.CanonicalMIMEHeaderKey("filename")]; ok && v != nil {
+		filenameB, err := base64.URLEncoding.DecodeString(*v)
+		if err != nil {
+			return "", "", 0, time.Time{}, err
+		}
+		filename = string(filenameB)
+	}
+
+	mimetype := ""
+	if v, ok := res.Metadata[textproto.CanonicalMIMEHeaderKey("mimetype")]; ok && v != nil {
+		mimetype = *v
+	}
+
+	size := int64(0)
+	if v := res.ContentLength; v != nil {
+		size = *v
+	}
+
+	timestamp := time.Time{}
+	if v, ok := res.Metadata[textproto.CanonicalMIMEHeaderKey("timestamp")]; ok && v != nil {
+		if err := timestamp.UnmarshalText([]byte(*v)); err != nil {
+			return "", "", 0, time.Time{}, err
+		}
+	}
+
+	return filename, mimetype, size, timestamp, nil
+}
+
+func (s *S3) Write(id string, r io.ReadSeeker, filename string, mimetype string) (int64, error) {
 	if s.keyExists(id) {
 		return 0, os.ErrExist
+	}
+
+	filename = base64.URLEncoding.EncodeToString([]byte(filename))
+
+	ts, err := time.Now().UTC().MarshalText()
+	if err != nil {
+		return 0, err
 	}
 
 	conf := &s3.PutObjectInput{
 		Body:   r,
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(id),
+		Metadata: map[string]*string{
+			textproto.CanonicalMIMEHeaderKey("filename"):  aws.String(filename),
+			textproto.CanonicalMIMEHeaderKey("mimetype"):  aws.String(mimetype),
+			textproto.CanonicalMIMEHeaderKey("timestamp"): aws.String(string(ts)),
+		},
 	}
 
 	if _, err := s.c.PutObject(conf); err != nil {
@@ -159,17 +164,44 @@ func (s *S3) WriteData(id string, r io.ReadSeeker) (int64, error) {
 	return r.Seek(0, io.SeekCurrent)
 }
 
-func (s *S3) DeleteData(id string) error {
+func (s *S3) Delete(id string) error {
 	conf := &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(id),
 	}
 
-	_, err := s.c.DeleteObject(conf)
+	if _, err := s.c.DeleteObject(conf); err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() == s3.ErrCodeNoSuchKey {
+				return os.ErrNotExist
+			}
+		}
+		return err
+	}
+
+	return nil
+}
+
+func handleError(w http.ResponseWriter, r *http.Request, err error) error {
+	if err != nil {
+		if aerr, ok := err.(awserr.RequestFailure); ok {
+			if h := aerr.StatusCode(); h == http.StatusNotModified {
+				w.WriteHeader(h)
+				return nil
+			}
+		}
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() == s3.ErrCodeNoSuchKey {
+				http.NotFound(w, r)
+				return nil
+			}
+		}
+	}
+
 	return err
 }
 
-func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
 	conf := &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(id),
@@ -196,9 +228,7 @@ func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, co
 
 	req, o := s.c.HeadObjectRequest(conf)
 	if err := req.Send(); err != nil {
-		if _, ok := err.(awserr.RequestFailure); !ok {
-			return err
-		}
+		return handleError(w, r, err)
 	}
 
 	if v := o.AcceptRanges; v != nil && *v != "" {
@@ -223,8 +253,8 @@ func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, co
 		w.Header().Set("Last-Modified", (*v).UTC().Format(http.TimeFormat))
 	}
 
-	if contentType != "" {
-		w.Header().Set("Content-Type", contentType)
+	if mimetype != "" {
+		w.Header().Set("Content-Type", mimetype)
 	}
 	if filename != "" {
 		if attachment {
@@ -238,7 +268,7 @@ func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, co
 	return nil
 }
 
-func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
 	conf := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(id),
@@ -265,9 +295,7 @@ func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, con
 
 	req, o := s.c.GetObjectRequest(conf)
 	if err := req.Send(); err != nil {
-		if _, ok := err.(awserr.RequestFailure); !ok {
-			return err
-		}
+		return handleError(w, r, err)
 	}
 
 	if v := o.AcceptRanges; v != nil && *v != "" {
@@ -298,8 +326,8 @@ func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, con
 		w.Header().Set("Last-Modified", (*v).UTC().Format(http.TimeFormat))
 	}
 
-	if contentType != "" {
-		w.Header().Set("Content-Type", contentType)
+	if mimetype != "" {
+		w.Header().Set("Content-Type", mimetype)
 	}
 	if filename != "" {
 		if attachment {
@@ -320,11 +348,11 @@ func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, con
 	return o.Body.Close()
 }
 
-func (s *S3) redirectDataGet(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+func (s *S3) redirectDataGet(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
 	conf := &s3.GetObjectInput{
 		Bucket:              aws.String(s.bucket),
 		Key:                 aws.String(id),
-		ResponseContentType: aws.String(contentType),
+		ResponseContentType: aws.String(mimetype),
 	}
 	if filename != "" {
 		if attachment {
@@ -344,17 +372,17 @@ func (s *S3) redirectDataGet(w http.ResponseWriter, r *http.Request, id string, 
 	return nil
 }
 
-func (s *S3) ServeData(w http.ResponseWriter, r *http.Request, id string, contentType string, filename string, attachment bool) error {
+func (s *S3) Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
 	switch r.Method {
 	case http.MethodHead:
 		// HEAD requests are always proxied
-		return s.serveDataHead(w, r, id, contentType, filename, attachment)
+		return s.serveDataHead(w, r, id, filename, mimetype, attachment)
 
 	case http.MethodGet:
 		if s.proxy {
-			return s.serveDataGet(w, r, id, contentType, filename, attachment)
+			return s.serveDataGet(w, r, id, filename, mimetype, attachment)
 		}
-		return s.redirectDataGet(w, r, id, contentType, filename, attachment)
+		return s.redirectDataGet(w, r, id, filename, mimetype, attachment)
 
 	default:
 		http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)

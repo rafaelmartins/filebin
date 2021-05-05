@@ -19,7 +19,7 @@ func (h *MarkdownRenderer) Supports(mimetype string) bool {
 }
 
 func (h *MarkdownRenderer) Render(w http.ResponseWriter, r *http.Request, fd *filedata.FileData) error {
-	f, err := fd.OpenData()
+	f, err := fd.Read()
 	if err != nil {
 		return err
 	}
