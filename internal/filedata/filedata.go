@@ -179,6 +179,7 @@ func NewFromRequest(r *http.Request) ([]*FileData, error) {
 	if r.MultipartForm == nil || r.MultipartForm.File == nil {
 		return nil, errors.New("filedata: no files")
 	}
+	defer r.MultipartForm.RemoveAll()
 
 	fhs := r.MultipartForm.File["file"]
 	if len(fhs) == 0 {
