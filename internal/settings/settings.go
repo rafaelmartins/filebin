@@ -32,6 +32,7 @@ type Settings struct {
 	S3ProxyData       bool
 	StorageDir        string
 	UploadMaxSizeMb   uint
+	IndexFooter       string
 	Backend           backends.Backend
 }
 
@@ -159,6 +160,11 @@ func Get() (*Settings, error) {
 	}
 
 	s.StorageDir, err = getString("FILEBIN_STORAGE_DIR", "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	s.IndexFooter, err = getString("FILEBIN_INDEX_FOOTER", "", false)
 	if err != nil {
 		return nil, err
 	}

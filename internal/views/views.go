@@ -26,11 +26,27 @@ var (
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	fmt.Fprintf(w, "%s\n", logo)
-	fmt.Fprintf(w, "Version %s, running at %s\n\n", version.Version, r.Host)
-	fmt.Fprintf(w, "Source code: https://github.com/rafaelmartins/filebin\n")
+	footer := ""
+	if s, err := settings.Get(); err == nil {
+		footer = s.IndexFooter
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+<title>filebin - %s</title>
+</head>
+<body>
+<pre>
+%s
+Version %s, running at %s
+
+Source code: <a href="https://github.com/rafaelmartins/filebin">https://github.com/rafaelmartins/filebin</a>
+%s</pre>
+</body>
+</html>
+`, r.Host, logo, version.Version, r.Host, footer)
 }
 
 func Robots(w http.ResponseWriter, r *http.Request) {
