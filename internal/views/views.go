@@ -199,7 +199,7 @@ func FileText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := fd.Serve(w, r, fd.GetFilename(), "text/plain; charset=utf-8", false); err != nil {
+	if err := fd.Serve(w, r, fd.GetFilename(), "text/plain; charset=utf-8", fd.Timestamp, false); err != nil {
 		utils.Error(w, err)
 	}
 }
@@ -210,7 +210,7 @@ func FileDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := fd.Serve(w, r, fd.GetFilename(), fd.Mimetype, true); err != nil {
+	if err := fd.Serve(w, r, fd.GetFilename(), fd.Mimetype, fd.Timestamp, true); err != nil {
 		utils.Error(w, err)
 	}
 }

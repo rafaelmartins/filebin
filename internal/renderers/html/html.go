@@ -13,5 +13,5 @@ func (h *HtmlRenderer) Supports(mimetype string) bool {
 }
 
 func (h *HtmlRenderer) Render(w http.ResponseWriter, r *http.Request, fd *filedata.FileData) error {
-	return fd.Serve(w, r, "", "text/html", false)
+	return fd.Serve(w, r, "", "text/html", fd.Timestamp, false)
 }

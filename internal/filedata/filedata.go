@@ -116,6 +116,9 @@ func processFile(fh *multipart.FileHeader) (*FileData, error) {
 	}
 
 	f, err := fh.Open()
+	if err != nil {
+		return nil, err
+	}
 	defer f.Close()
 
 	if fh.Size > int64(s.UploadMaxSizeMb)*1024*1024 {
@@ -277,13 +280,13 @@ func (f *FileData) GetFilename() string {
 	return f.Filename
 }
 
-func (f *FileData) Serve(w http.ResponseWriter, r *http.Request, filename string, mimetype string, attachment bool) error {
+func (f *FileData) Serve(w http.ResponseWriter, r *http.Request, filename string, mimetype string, timestamp time.Time, attachment bool) error {
 	s, err := settings.Get()
 	if err != nil {
 		return err
 	}
 
-	return s.Backend.Serve(w, r, f.id, filename, mimetype, attachment)
+	return s.Backend.Serve(w, r, f.id, filename, mimetype, timestamp, attachment)
 }
 
 func (f *FileData) Read() (io.ReadCloser, error) {

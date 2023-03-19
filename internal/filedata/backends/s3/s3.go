@@ -242,7 +242,7 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) error {
 	return err
 }
 
-func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
+func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, timestamp time.Time, attachment bool) error {
 	conf := &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(id),
@@ -290,7 +290,12 @@ func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, fi
 	if v := o.ETag; v != nil && *v != "" {
 		w.Header().Set("ETag", *v)
 	}
-	if v := o.LastModified; v != nil && !(*v).IsZero() {
+	if v := o.Expires; v != nil && *v != "" {
+		w.Header().Set("Expires", *v)
+	}
+	if !timestamp.IsZero() {
+		w.Header().Set("Last-Modified", timestamp.UTC().Format(http.TimeFormat))
+	} else if v := o.LastModified; v != nil && !(*v).IsZero() {
 		w.Header().Set("Last-Modified", (*v).UTC().Format(http.TimeFormat))
 	}
 
@@ -309,7 +314,7 @@ func (s *S3) serveDataHead(w http.ResponseWriter, r *http.Request, id string, fi
 	return nil
 }
 
-func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
+func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, timestamp time.Time, attachment bool) error {
 	conf := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(id),
@@ -363,7 +368,9 @@ func (s *S3) serveDataGet(w http.ResponseWriter, r *http.Request, id string, fil
 	if v := o.Expires; v != nil && *v != "" {
 		w.Header().Set("Expires", *v)
 	}
-	if v := o.LastModified; v != nil && !(*v).IsZero() {
+	if !timestamp.IsZero() {
+		w.Header().Set("Last-Modified", timestamp.UTC().Format(http.TimeFormat))
+	} else if v := o.LastModified; v != nil && !(*v).IsZero() {
 		w.Header().Set("Last-Modified", (*v).UTC().Format(http.TimeFormat))
 	}
 
@@ -413,15 +420,15 @@ func (s *S3) redirectDataGet(w http.ResponseWriter, r *http.Request, id string, 
 	return nil
 }
 
-func (s *S3) Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
+func (s *S3) Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, timestamp time.Time, attachment bool) error {
 	switch r.Method {
 	case http.MethodHead:
 		// HEAD requests are always proxied
-		return s.serveDataHead(w, r, id, filename, mimetype, attachment)
+		return s.serveDataHead(w, r, id, filename, mimetype, timestamp, attachment)
 
 	case http.MethodGet:
 		if s.proxy {
-			return s.serveDataGet(w, r, id, filename, mimetype, attachment)
+			return s.serveDataGet(w, r, id, filename, mimetype, timestamp, attachment)
 		}
 		return s.redirectDataGet(w, r, id, filename, mimetype, attachment)
 

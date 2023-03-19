@@ -20,5 +20,5 @@ func (h *RawRenderer) Render(w http.ResponseWriter, r *http.Request, fd *filedat
 		attachment = false
 	}
 
-	return fd.Serve(w, r, fd.GetFilename(), fd.Mimetype, attachment)
+	return fd.Serve(w, r, fd.GetFilename(), fd.Mimetype, fd.Timestamp, attachment)
 }

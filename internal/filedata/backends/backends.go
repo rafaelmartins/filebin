@@ -17,7 +17,7 @@ type Backend interface {
 	ReadMetadata(id string) (string, string, int64, time.Time, error)
 	Write(id string, r io.ReadSeeker, filename string, mimetype string) (int64, error)
 	Delete(id string) error
-	Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error
+	Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, timestamp time.Time, attachment bool) error
 }
 
 func Lookup(dir string, s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration, s3ProxyData bool, s3SslInsecure bool, s3SslCertificate string) (Backend, error) {

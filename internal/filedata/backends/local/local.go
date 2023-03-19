@@ -134,7 +134,7 @@ func (l *Local) Delete(id string) error {
 	return nil
 }
 
-func (l *Local) Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error {
+func (l *Local) Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, timestamp time.Time, attachment bool) error {
 	fn := filepath.Join(l.dir, id)
 	w.Header().Set("Content-Type", mimetype)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -144,6 +144,9 @@ func (l *Local) Serve(w http.ResponseWriter, r *http.Request, id string, filenam
 		} else {
 			w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
 		}
+	}
+	if !timestamp.IsZero() {
+		w.Header().Set("Last-Modified", timestamp.UTC().Format(http.TimeFormat))
 	}
 	http.ServeFile(w, r, fn)
 	return nil
