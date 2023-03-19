@@ -30,6 +30,8 @@ type Settings struct {
 	S3Bucket          string
 	S3PresignExpire   time.Duration
 	S3ProxyData       bool
+	S3SslInsecure     bool
+	S3SslCertificate  string
 	StorageDir        string
 	UploadMaxSizeMb   uint
 	IndexFooter       string
@@ -159,6 +161,16 @@ func Get() (*Settings, error) {
 		return nil, err
 	}
 
+	s.S3SslInsecure, err = getBool("FILEBIN_S3_SSL_INSECURE", false)
+	if err != nil {
+		return nil, err
+	}
+
+	s.S3SslCertificate, err = getString("FILEBIN_S3_SSL_CERTIFICATE", "", false)
+	if err != nil {
+		return nil, err
+	}
+
 	s.StorageDir, err = getString("FILEBIN_STORAGE_DIR", "", false)
 	if err != nil {
 		return nil, err
@@ -187,6 +199,8 @@ func Get() (*Settings, error) {
 		s.S3Bucket,
 		s.S3PresignExpire,
 		s.S3ProxyData,
+		s.S3SslInsecure,
+		s.S3SslCertificate,
 	)
 	if err != nil {
 		return nil, err

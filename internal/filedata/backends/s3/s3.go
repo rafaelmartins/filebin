@@ -1,9 +1,12 @@
 package s3
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/textproto"
 	"os"
@@ -23,18 +26,56 @@ type S3 struct {
 	proxy  bool
 }
 
-func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration, s3ProxyData bool) *S3 {
-	conf := &aws.Config{
-		Credentials: credentials.NewStaticCredentials(s3AccessKeyId, s3SecretAccessKey, ""),
-		Endpoint:    aws.String(s3Endpoint),
-		Region:      aws.String(s3Region),
+func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration, s3ProxyData bool, s3SslInsecure bool, s3SslCertificate string) (*S3, error) {
+	certpool, err := x509.SystemCertPool()
+	if err != nil {
+		certpool = x509.NewCertPool()
 	}
+	if s3SslCertificate != "" {
+		certData, err := os.ReadFile(s3SslCertificate)
+		if err != nil {
+			return nil, err
+		}
+		certpool.AppendCertsFromPEM(certData)
+	}
+
+	conf := &aws.Config{
+		Credentials:      credentials.NewStaticCredentials(s3AccessKeyId, s3SecretAccessKey, ""),
+		Endpoint:         aws.String(s3Endpoint),
+		Region:           aws.String(s3Region),
+		S3ForcePathStyle: aws.Bool(true),
+		HTTPClient: &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				DialContext: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+					DualStack: true,
+				}).DialContext,
+				ForceAttemptHTTP2:   true,
+				MaxIdleConns:        100,
+				IdleConnTimeout:     90 * time.Second,
+				TLSHandshakeTimeout: 10 * time.Second,
+				TLSClientConfig: &tls.Config{
+					RootCAs:            certpool,
+					InsecureSkipVerify: s3SslInsecure,
+				},
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
+	}
+
+	sess, err := session.NewSession(conf)
+	if err != nil {
+		return nil, err
+	}
+
 	return &S3{
-		c:      s3.New(session.New(conf)),
+		c:      s3.New(sess),
 		bucket: s3Bucket,
 		expire: s3PresignExpire,
 		proxy:  s3ProxyData,
-	}
+	}, nil
 }
 
 func (s *S3) keyExists(k string) bool {

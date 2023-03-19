@@ -20,7 +20,7 @@ type Backend interface {
 	Serve(w http.ResponseWriter, r *http.Request, id string, filename string, mimetype string, attachment bool) error
 }
 
-func Lookup(dir string, s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration, s3ProxyData bool) (Backend, error) {
+func Lookup(dir string, s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration, s3ProxyData bool, s3SslInsecure bool, s3SslCertificate string) (Backend, error) {
 	if s3AccessKeyId != "" && s3SecretAccessKey != "" && s3Region != "" && s3Bucket != "" {
 		return s3.NewS3(
 			s3AccessKeyId,
@@ -30,7 +30,9 @@ func Lookup(dir string, s3AccessKeyId string, s3SecretAccessKey string, s3Endpoi
 			s3Bucket,
 			s3PresignExpire,
 			s3ProxyData,
-		), nil
+			s3SslInsecure,
+			s3SslCertificate,
+		)
 	}
 
 	if dir != "" {
