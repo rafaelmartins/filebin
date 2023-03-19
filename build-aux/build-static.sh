@@ -1,6 +1,6 @@
 #!/bin/bash -xe
 
-FILE_PV="5.39"
+FILE_PV="5.44"
 
 export CC=musl-gcc
 export CGO_CFLAGS="-I${BUILDDIR}/file-${FILE_PV}/src"
@@ -31,11 +31,15 @@ popd > /dev/null
 rm -rf "${BUILDDIR}/${PN}-static-linux-amd64-${PV}"
 mkdir -p "${BUILDDIR}/${PN}-static-linux-amd64-${PV}"
 
+pushd "${SRCDIR}" > /dev/null
+go build "${@}"
+popd > /dev/null
+
 pushd "${BUILDDIR}/${PN}-static-linux-amd64-${PV}" > /dev/null
-go build "${@}" "${SRCDIR}"
 cp "${BUILDDIR}/file-${FILE_PV}/magic/magic.mgc" .
 cp "${BUILDDIR}/file-${FILE_PV}/COPYING" LICENSE-libmagic
 cp "${SRCDIR}/LICENSE" .
+cp "${SRCDIR}/filebin" .
 popd > /dev/null
 
 rm -f "file-${FILE_PV}.tar.gz"
