@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         target:
-          #- distcheck
+          - distcheck
           - static-dist-linux-amd64
 
     steps:
