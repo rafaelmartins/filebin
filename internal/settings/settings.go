@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rafaelmartins/filebin/internal/filedata/backends"
+	"github.com/rafaelmartins/filebin/internal/filedata/backends/s3"
 )
 
 var (
@@ -15,27 +16,20 @@ var (
 )
 
 type Settings struct {
-	AuthRealm         string
-	AuthUsername      string
-	AuthPassword      string
-	BaseUrl           string
-	HighlightStyle    string
-	IdLength          uint8
-	ListenAddr        string
-	S3AccessKeyId     string
-	S3SecretAccessKey string
-	S3SessionToken    string
-	S3Endpoint        string
-	S3Region          string
-	S3Bucket          string
-	S3PresignExpire   time.Duration
-	S3ProxyData       bool
-	S3SslInsecure     bool
-	S3SslCertificate  string
-	StorageDir        string
-	UploadMaxSizeMb   uint
-	IndexFooter       string
-	Backend           backends.Backend
+	AuthRealm       string
+	AuthUsername    string
+	AuthPassword    string
+	BaseUrl         string
+	HighlightStyle  string
+	IdLength        uint8
+	ListenAddr      string
+	UploadMaxSizeMb uint
+	IndexFooter     string
+
+	S3Options  s3.S3Options
+	StorageDir string
+
+	Backend backends.Backend
 }
 
 func getString(key string, def string, required bool) (string, error) {
@@ -125,27 +119,27 @@ func Get() (*Settings, error) {
 		return nil, err
 	}
 
-	s.S3AccessKeyId, err = getString("FILEBIN_S3_ACCESS_KEY_ID", "", false)
+	s.S3Options.AccessKeyId, err = getString("FILEBIN_S3_ACCESS_KEY_ID", "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	s.S3SecretAccessKey, err = getString("FILEBIN_S3_SECRET_ACCESS_KEY", "", false)
+	s.S3Options.SecretAccessKey, err = getString("FILEBIN_S3_SECRET_ACCESS_KEY", "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	s.S3Endpoint, err = getString("FILEBIN_S3_ENDPOINT", "", false)
+	s.S3Options.Endpoint, err = getString("FILEBIN_S3_ENDPOINT", "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	s.S3Region, err = getString("FILEBIN_S3_REGION", "", false)
+	s.S3Options.Region, err = getString("FILEBIN_S3_REGION", "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	s.S3Bucket, err = getString("FILEBIN_S3_BUCKET", "", false)
+	s.S3Options.Bucket, err = getString("FILEBIN_S3_BUCKET", "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -154,19 +148,24 @@ func Get() (*Settings, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.S3PresignExpire = time.Duration(s3PresignExpireMinutes) * time.Minute
+	s.S3Options.PresignExpire = time.Duration(s3PresignExpireMinutes) * time.Minute
 
-	s.S3ProxyData, err = getBool("FILEBIN_S3_PROXY_DATA", false)
+	s.S3Options.ProxyData, err = getBool("FILEBIN_S3_PROXY_DATA", false)
 	if err != nil {
 		return nil, err
 	}
 
-	s.S3SslInsecure, err = getBool("FILEBIN_S3_SSL_INSECURE", false)
+	s.S3Options.ForcePathStyle, err = getBool("FILEBIN_S3_FORCE_PATH_STYLE", false)
 	if err != nil {
 		return nil, err
 	}
 
-	s.S3SslCertificate, err = getString("FILEBIN_S3_SSL_CERTIFICATE", "", false)
+	s.S3Options.SslInsecure, err = getBool("FILEBIN_S3_SSL_INSECURE", false)
+	if err != nil {
+		return nil, err
+	}
+
+	s.S3Options.SslCertificate, err = getString("FILEBIN_S3_SSL_CERTIFICATE", "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -190,18 +189,7 @@ func Get() (*Settings, error) {
 	}
 	s.UploadMaxSizeMb = uint(uploadMaxSizeMb)
 
-	s.Backend, err = backends.Lookup(
-		s.StorageDir,
-		s.S3AccessKeyId,
-		s.S3SecretAccessKey,
-		s.S3Endpoint,
-		s.S3Region,
-		s.S3Bucket,
-		s.S3PresignExpire,
-		s.S3ProxyData,
-		s.S3SslInsecure,
-		s.S3SslCertificate,
-	)
+	s.Backend, err = backends.Lookup(s.StorageDir, s.S3Options)
 	if err != nil {
 		return nil, err
 	}

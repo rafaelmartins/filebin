@@ -19,6 +19,20 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+type S3Options struct {
+	AccessKeyId     string
+	SecretAccessKey string
+	SessionToken    string
+	Endpoint        string
+	Region          string
+	Bucket          string
+	PresignExpire   time.Duration
+	ProxyData       bool
+	ForcePathStyle  bool
+	SslInsecure     bool
+	SslCertificate  string
+}
+
 type S3 struct {
 	c      *s3.S3
 	bucket string
@@ -26,13 +40,13 @@ type S3 struct {
 	proxy  bool
 }
 
-func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3Region string, s3Bucket string, s3PresignExpire time.Duration, s3ProxyData bool, s3SslInsecure bool, s3SslCertificate string) (*S3, error) {
+func NewS3(options S3Options) (*S3, error) {
 	certpool, err := x509.SystemCertPool()
 	if err != nil {
 		certpool = x509.NewCertPool()
 	}
-	if s3SslCertificate != "" {
-		certData, err := os.ReadFile(s3SslCertificate)
+	if options.SslCertificate != "" {
+		certData, err := os.ReadFile(options.SslCertificate)
 		if err != nil {
 			return nil, err
 		}
@@ -40,10 +54,10 @@ func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3
 	}
 
 	conf := &aws.Config{
-		Credentials:      credentials.NewStaticCredentials(s3AccessKeyId, s3SecretAccessKey, ""),
-		Endpoint:         aws.String(s3Endpoint),
-		Region:           aws.String(s3Region),
-		S3ForcePathStyle: aws.Bool(true),
+		Credentials:      credentials.NewStaticCredentials(options.AccessKeyId, options.SecretAccessKey, ""),
+		Endpoint:         aws.String(options.Endpoint),
+		Region:           aws.String(options.Region),
+		S3ForcePathStyle: aws.Bool(options.ForcePathStyle),
 		HTTPClient: &http.Client{
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
@@ -58,7 +72,7 @@ func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3
 				TLSHandshakeTimeout: 10 * time.Second,
 				TLSClientConfig: &tls.Config{
 					RootCAs:            certpool,
-					InsecureSkipVerify: s3SslInsecure,
+					InsecureSkipVerify: options.SslInsecure,
 				},
 				ExpectContinueTimeout: 1 * time.Second,
 			},
@@ -72,9 +86,9 @@ func NewS3(s3AccessKeyId string, s3SecretAccessKey string, s3Endpoint string, s3
 
 	return &S3{
 		c:      s3.New(sess),
-		bucket: s3Bucket,
-		expire: s3PresignExpire,
-		proxy:  s3ProxyData,
+		bucket: options.Bucket,
+		expire: options.PresignExpire,
+		proxy:  options.ProxyData,
 	}, nil
 }
 
