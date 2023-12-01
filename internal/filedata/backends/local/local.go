@@ -31,6 +31,10 @@ func NewLocal(dir string) (*Local, error) {
 		if err := os.MkdirAll(dir, 0777); err != nil {
 			return nil, err
 		}
+		st, err = os.Stat(dir)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if !st.IsDir() {
 		return nil, errors.New("local: defined storage directory is not a directory")
